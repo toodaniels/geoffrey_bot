@@ -131,3 +131,6 @@ dmypy.json
 *.session
 
 downloaded/
+sync/
+homeassistant/
+netalertx/
