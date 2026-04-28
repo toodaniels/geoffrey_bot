@@ -1,20 +1,82 @@
-version: '3.8'
+version: "3.8"
 
 services:
-  geoffrey-bot:
-    image: localhost/geoffrey-telegram-bot:latest
-    container_name: geoffrey-bot
+  syncthing:
+    image: syncthing/syncthing
+    container_name: syncthing
+    network_mode: host
+    hostname: omni
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./downloads:/var/syncthing:Z
+      - ./sync:/var/config_syncthing:Z
+    command: ["--home", "/var/config_syncthing", "--gui-address", "0.0.0.0:8384"]
+    ports:
+      - 8000:8384
+      - 22000:22000/tcp
+      - 21027:21027/udp
     restart: unless-stopped
+
+  geoffrey-bot:
+    image: ghcr.io/toodaniels/geoffrey_telegram:main
+    container_name: geoffrey-bot
+    restart: always
     env_file:
-      - ./.env
+      - .env
     volumes:
       - ./downloads:/app/downloads
+
+  jellyfin:
+    image: docker.io/jellyfin/jellyfin:latest
+    container_name: myjellyfin
     environment:
-      - DOWNLOAD_PATH=/app/downloads
-    # Uncomment and adjust the following if you need to expose any ports
-    # ports:
-    #   - "8080:8080"
-    # Add any other environment variables your bot needs here
-    # environment:
-    #   - TELEGRAM_API_KEY=${TELEGRAM_API_KEY}
-    #   - OTHER_VAR=${OTHER_VAR}
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Mexico_City
+    user: "1000:1000"
+    ports:
+      - "8096:8096/tcp"
+      - "7359:7359/udp"
+      - "1900:1900/udp"
+    volumes:
+      - $HOME/jellyfin/config:/config:Z
+      - $HOME/jellyfin/cache:/cache:Z
+      - ./downloads:/media:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8096/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    restart: unless-stopped
+    environment:
+      - TZ=America/Mexico_City
+    volumes:
+      - ./homeassistant:/config
+      - /etc/localtime:/etc/localtime:ro
+      - /run/dbus:/run/dbus:ro
+    privileged: true
+    network_mode: host
+
+#  netalertx:
+#    image: ghcr.io/netalertx/netalertx:latest
+#    container_name: netalertx
+#    restart: unless-stopped
+#    ports:
+#      - "20211:20211"
+#      - "20214:20214"
+#    environment:
+#      - PORT=20211
+#      - TZ=America/Mexico_City
+#      - SKIP_TESTS=1
+#    volumes:
+#      - ./netalertx:/data
+#      - /etc/localtime:/etc/localtime:ro
+#    tmpfs:
+#      - /tmp
