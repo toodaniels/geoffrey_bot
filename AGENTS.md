@@ -65,4 +65,5 @@ When the user requests to create a branch, commit, and PR:
 5. Create PR using `gh pr create` with the format:
    - Title: descriptive
    - Body: summary bullet points + "\n---\n*PR created automatically by Geoffrey.*"
-6. Handle any merge conflicts with main before pushing the resolved changes
+6. Add `geoffrey-bot` label/tag to the PR using `gh pr edit --add-label geoffrey-bot`.
+7. Handle any merge conflicts with main before pushing the resolved changes
