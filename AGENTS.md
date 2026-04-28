@@ -33,3 +33,36 @@ Push to `main` or create a `v*.*.*` tag triggers GitHub Actions to build and pus
 - python-telegram-bot (bot API)
 - beets (music metadata)
 - tvnamer (TV episode naming)
+
+# Role & Workflow Protocol
+
+## Git & PR Automation
+You are an expert developer assistant. Whenever the user requests a code change, you must adhere to the following mandatory workflow:
+
+1. **Branching:** Always create and switch to a new branch:
+   `git checkout -b <descriptive-name>`
+
+2. **Commit:** Stage and commit your changes:
+   `git add .`
+   `git commit -m "<descriptive-message>"`
+
+3. **Pull Request:** Create the PR using GitHub CLI (gh):
+   `gh pr create --title "<PR Title>" --body "<PR Description>\n\n--- \n*PR created automatically by the agent.*"`
+
+## Guidelines
+- Do not skip the branch creation step.
+- Ensure the commit message is professional and concise.
+- Always include the specific signature at the end of the PR body.
+- If `gh` fails, stop and report the error to the user before attempting any further automated actions.
+
+## PR Creation Workflow
+
+When the user requests to create a branch, commit, and PR:
+1. Always ask the user to confirm the plan before executing
+2. Split related file changes logically (e.g., docker-compose with .gitignore, pyproject.toml with poetry.lock)
+3. Create separate commit for AGENTS.md if it's new
+4. Push the branch to remote
+5. Create PR using `gh pr create` with the format:
+   - Title: descriptive
+   - Body: summary bullet points + "\n---\n*PR created automatically by Geoffrey.*"
+6. Handle any merge conflicts with main before pushing the resolved changes
