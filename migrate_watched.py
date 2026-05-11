@@ -9,9 +9,9 @@ load_dotenv()
 
 API_KEY = os.getenv("JELLYFIN_API_KEY")
 JELLYFIN_URL = "http://localhost:8096"
-USER_ID = os.getenv("JELLYFIN_USER_ID", "4ae86364dc094a09b6b1aa0f655d6f2e")
-SOURCE_BASE_SERIES = os.getenv("SOURCE_BASE_SERIES", "/home/toodaniels/Documents/geoffrey_telegram/downloads/Series")
-SOURCE_BASE_MOVIES = os.getenv("SOURCE_BASE_MOVIES", "/home/toodaniels/Documents/geoffrey_telegram/downloads/Movies")
+USER_ID = os.getenv("JELLYFIN_USER_ID")
+SOURCE_BASE_SERIES = os.getenv("SOURCE_BASE_SERIES")
+SOURCE_BASE_MOVIES = os.getenv("SOURCE_BASE_MOVIES")
 TARGET_BASE_SERIES = "/mnt/avivo/Series"
 TARGET_BASE_MOVIES = "/mnt/avivo/Movies"
 
