@@ -34,6 +34,10 @@ Push to `main` or create a `v*.*.*` tag triggers GitHub Actions to build and pus
 - beets (music metadata)
 - tvnamer (TV episode naming)
 
+## Automated Maintenance
+
+- **Disk Cleanup:** A script `scripts/run_migrate_watched.sh` is scheduled to run daily at 12 AM via cron to perform disk space cleanup using `migrate_watched.py`.
+
 # Role & Workflow Protocol
 
 ## Git & PR Automation
