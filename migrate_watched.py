@@ -9,10 +9,18 @@ load_dotenv()
 API_KEY = os.getenv("JELLYFIN_API_KEY")
 JELLYFIN_URL = "http://localhost:8096"
 USER_ID = "4ae86364dc094a09b6b1aa0f655d6f2e" # Updated user ID
-SOURCE_BASE_SERIES = "/media/Series"
-SOURCE_BASE_MOVIES = "/media/Movies"
+SOURCE_BASE_SERIES = "/home/toodaniels/Documents/geoffrey_telegram/downloads/Series"
+SOURCE_BASE_MOVIES = "/home/toodaniels/Documents/geoffrey_telegram/downloads/Movies"
 TARGET_BASE_SERIES = "/mnt/avivo/Series"
 TARGET_BASE_MOVIES = "/mnt/avivo/Movies"
+
+# Map Jellyfin's internal paths to host paths
+def translate_path(path):
+    if "/media/Series" in path:
+        return path.replace("/media/Series", SOURCE_BASE_SERIES)
+    if "/media/Movies" in path:
+        return path.replace("/media/Movies", SOURCE_BASE_MOVIES)
+    return path
 
 headers = {
     "X-Emby-Token": API_KEY,
@@ -37,6 +45,9 @@ def migrate_items(dry_run=True):
         if not source_path:
             continue
             
+        # Translate internal container path to host path
+        source_path = translate_path(source_path)
+            
         is_movie = item.get("Type") == "Movie"
         
         # Determine source and target base based on item type
@@ -52,8 +63,11 @@ def migrate_items(dry_run=True):
         print(f"{'[DRY RUN] ' if dry_run else ''}Moving {item.get('Type')}: {source_path} -> {dest_path}")
         
         if not dry_run:
-            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-            shutil.move(source_path, dest_path)
+            if os.path.exists(source_path):
+                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                shutil.move(source_path, dest_path)
+            else:
+                print(f"File not found: {source_path}")
 
 if __name__ == "__main__":
-    migrate_items(dry_run=True)
+    migrate_items(dry_run=False)
