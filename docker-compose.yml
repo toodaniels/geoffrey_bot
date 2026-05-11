@@ -27,6 +27,7 @@ services:
       - .env
     volumes:
       - ./downloads:/app/downloads
+      - /mnt/avivo:/app/avivo:rw
 
   jellyfin:
     image: docker.io/jellyfin/jellyfin:latest
@@ -43,7 +44,8 @@ services:
     volumes:
       - $HOME/jellyfin/config:/config:Z
       - $HOME/jellyfin/cache:/cache:Z
-      - ./downloads:/media:ro
+      - ./downloads:/media:rw
+      - /mnt/avivo:/mnt/avivo:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8096/health"]
