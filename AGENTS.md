@@ -37,6 +37,7 @@ Push to `main` or create a `v*.*.*` tag triggers GitHub Actions to build and pus
 ## Automated Maintenance
 
 - **Disk Cleanup:** A script `scripts/run_migrate_watched.sh` is scheduled to run daily at 12 AM via cron to perform disk space cleanup using `migrate_watched.py`.
+- **Media Organization:** A script `scripts/jellyfin_headless.py` is scheduled to run every 6 hours via cron to automatically rename, classify, and organize media files into Jellyfin folders (Series/Movies), skipping active downloads detected from `geoffrey-bot` logs.
 
 # Role & Workflow Protocol
 
