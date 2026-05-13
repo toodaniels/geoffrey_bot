@@ -1,44 +1,55 @@
 import os
-import requests
+import re
 import subprocess
 import sys
 from dotenv import load_dotenv
 
 load_dotenv()
-JELLYFIN_URL = os.getenv("JELLYFIN_URL")
-JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
-JELLYFIN_USER_ID = os.getenv("JELLYFIN_USER_ID")
+DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "./downloads/Video")
 
-def get_series_list():
-    if not JELLYFIN_API_KEY or not JELLYFIN_URL or not JELLYFIN_USER_ID:
-        return ""
-    headers = {"X-Emby-Token": JELLYFIN_API_KEY}
-    url = f"{JELLYFIN_URL}/Items?userId={JELLYFIN_USER_ID}&IncludeItemTypes=Series&Recursive=true"
-    try:
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            items = response.json().get("Items", [])
-            return "\n".join([item["Name"] for item in items])
-    except:
-        pass
-    return ""
+def get_active_downloads():
+    """Obtiene los archivos actualmente en descarga desde los logs del bot."""
+    log_stream = os.popen("podman logs geoffrey-bot | tail -n 100").read()
+    pattern = r"Original filename: (.*?)\n"
+    return re.findall(pattern, log_stream)
 
-def determine_series(filename):
-    series_list = get_series_list()
-    prompt = f"Tengo el archivo '{filename}'. Del siguiente listado de series en mi Jellyfin, determina a cuál pertenece. Contesta solo el nombre de la serie:\n\n{series_list}"
-    
-    # Llamada al agente (Hermes)
+def process_file_with_tvnamer(file_path):
+    """
+    Ejecuta tvnamer en modo batch para renombrar automáticamente.
+    -b: batch (renombrar sin intervención)
+    -f: selectfirst (selecciona automáticamente el primer resultado de búsqueda)
+    """
     try:
-        result = subprocess.run(
-            ["hermes", "chat", "-q", prompt],
-            capture_output=True, text=True, check=True
+        print(f"Renombrando automáticamente: {file_path}")
+        subprocess.run(
+            ["poetry", "run", "tvnamer", "--batch", "--selectfirst", file_path],
+            check=True, capture_output=True, text=True
         )
-        return result.stdout.strip()
-    except Exception as e:
-        return f"Error: {e}"
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error al renombrar {file_path}: {e.stderr}")
+        return False
+
+def main():
+    active_downloads = get_active_downloads()
+    print(f"Descargas activas detectadas: {active_downloads}")
+    
+    # Procesar archivos en la carpeta de videos
+    video_path = os.path.join(DOWNLOAD_PATH, "Video")
+    if not os.path.exists(video_path):
+        print(f"Carpeta no encontrada: {video_path}")
+        return
+
+    for filename in os.listdir(video_path):
+        if filename.endswith(".mkv") or filename.endswith(".mp4"):
+            # Omitir si es un archivo en descarga activa
+            if any(filename in active for active in active_downloads):
+                print(f"Omitiendo {filename}: está en descarga activa.")
+                continue
+            
+            # Ejecutar tvnamer
+            file_path = os.path.join(video_path, filename)
+            process_file_with_tvnamer(file_path)
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        print(determine_series(sys.argv[1]))
-    else:
-        print("Uso: python scripts/jellyfin_headless.py <nombre_archivo>")
+    main()
