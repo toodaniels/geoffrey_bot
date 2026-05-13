@@ -1,55 +1,70 @@
 import os
 import re
 import subprocess
-import sys
+import shutil
+import logging
 from dotenv import load_dotenv
 
 load_dotenv()
-DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "./downloads/Video")
+DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH", "./downloads")
+SERIES_BASE = os.getenv("SOURCE_BASE_SERIES", os.path.join(DOWNLOAD_PATH, "Series"))
+MOVIES_BASE = os.getenv("SOURCE_BASE_MOVIES", os.path.join(DOWNLOAD_PATH, "Movies"))
+
+logging.basicConfig(level=logging.INFO)
 
 def get_active_downloads():
-    """Obtiene los archivos actualmente en descarga desde los logs del bot."""
     log_stream = os.popen("podman logs geoffrey-bot | tail -n 100").read()
     pattern = r"Original filename: (.*?)\n"
     return re.findall(pattern, log_stream)
 
-def process_file_with_tvnamer(file_path):
+def organize_media(file_path):
     """
-    Ejecuta tvnamer en modo batch para renombrar automáticamente.
-    -b: batch (renombrar sin intervención)
-    -f: selectfirst (selecciona automáticamente el primer resultado de búsqueda)
+    Identifica si es serie o película y mueve a la carpeta correspondiente.
+    Usa tvnamer para obtener metadatos y renombrar.
     """
+    filename = os.path.basename(file_path)
+    
+    # 1. Renombrar usando tvnamer
     try:
-        print(f"Renombrando automáticamente: {file_path}")
-        subprocess.run(
-            ["poetry", "run", "tvnamer", "--batch", "--selectfirst", file_path],
-            check=True, capture_output=True, text=True
-        )
-        return True
-    except subprocess.CalledProcessError as e:
-        print(f"Error al renombrar {file_path}: {e.stderr}")
-        return False
+        logging.info(f"Renombrando con tvnamer: {filename}")
+        subprocess.run(["poetry", "run", "tvnamer", "--batch", "--selectfirst", "--move", file_path], 
+                       check=True, capture_output=True, text=True)
+        # El archivo ya debería estar renombrado. tvnamer suele mantenerlo en el directorio 
+        # o moverlo si se configura. Por simplicidad, buscamos el archivo renombrado en la misma carpeta.
+    except Exception as e:
+        logging.error(f"Error con tvnamer: {e}")
+        return
+
+    # 2. Lógica de organización (Detectar serie o película)
+    # Ejemplo de nombre de tvnamer: "True Beauty - S01E07.mkv"
+    match = re.search(r"(.*) - S(\d+)E(\d+)", filename, re.IGNORECASE)
+    
+    if match:
+        series_name, season, episode = match.groups()
+        target_dir = os.path.join(SERIES_BASE, series_name.strip(), f"Season {int(season)}")
+        os.makedirs(target_dir, exist_ok=True)
+        shutil.move(file_path, os.path.join(target_dir, filename))
+        logging.info(f"Movido a serie: {target_dir}")
+    else:
+        # Si no es serie, a Movies
+        os.makedirs(MOVIES_BASE, exist_ok=True)
+        shutil.move(file_path, os.path.join(MOVIES_BASE, filename))
+        logging.info(f"Movido a películas: {MOVIES_BASE}")
 
 def main():
     active_downloads = get_active_downloads()
-    print(f"Descargas activas detectadas: {active_downloads}")
-    
-    # Procesar archivos en la carpeta de videos
     video_path = os.path.join(DOWNLOAD_PATH, "Video")
+    
     if not os.path.exists(video_path):
-        print(f"Carpeta no encontrada: {video_path}")
         return
 
     for filename in os.listdir(video_path):
-        if filename.endswith(".mkv") or filename.endswith(".mp4"):
-            # Omitir si es un archivo en descarga activa
+        if filename.endswith((".mkv", ".mp4")):
             if any(filename in active for active in active_downloads):
-                print(f"Omitiendo {filename}: está en descarga activa.")
                 continue
             
-            # Ejecutar tvnamer
             file_path = os.path.join(video_path, filename)
-            process_file_with_tvnamer(file_path)
+            organize_media(file_path)
 
 if __name__ == "__main__":
     main()
