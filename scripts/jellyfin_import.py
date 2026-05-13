@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 JELLYFIN_URL = os.getenv("JELLYFIN_URL")
 JELLYFIN_API_KEY = os.getenv("JELLYFIN_API_KEY")
-JELLYFIN_USER_ID = "4ae86364dc094a09b6b1aa0f655d6f2e"
+JELLYFIN_USER_ID = os.getenv("JELLYFIN_USER_ID")
 DOWNLOAD_PATH = os.getenv("DOWNLOAD_PATH")
 
 def get_active_downloads():
@@ -17,7 +17,7 @@ def get_active_downloads():
     return re.findall(pattern, log_stream)
 
 def find_series_id(series_name):
-    if not JELLYFIN_API_KEY or not JELLYFIN_URL:
+    if not JELLYFIN_API_KEY or not JELLYFIN_URL or not JELLYFIN_USER_ID:
         print("Error: Configuración de Jellyfin incompleta.")
         return None
     headers = {"X-Emby-Token": JELLYFIN_API_KEY}
