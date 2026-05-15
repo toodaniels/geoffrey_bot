@@ -59,15 +59,16 @@ def main():
         return
 
     # Procesar archivos en la carpeta de videos
-    for filename in os.listdir(video_path):
-        if filename.endswith((".mkv", ".mp4")):
-            # Omitir si es un archivo en descarga activa
-            if any(filename in active for active in active_downloads):
-                print(f"Omitiendo {filename}: está en descarga activa.")
-                continue
-            
-            file_path = os.path.join(video_path, filename)
-            organize_media(file_path)
+    for root, dirs, files in os.walk(DOWNLOAD_PATH):
+        for filename in files:
+            if filename.endswith((".mkv", ".mp4")):
+                # Omitir si es un archivo en descarga activa
+                if any(filename in active for active in active_downloads):
+                    print(f"Omitiendo {filename}: está en descarga activa.")
+                    continue
+                
+                file_path = os.path.join(root, filename)
+                organize_media(file_path)
 
 
 if __name__ == "__main__":
