@@ -54,6 +54,10 @@ def migrate_items(dry_run=True):
         if not source_path or is_downloading(source_path):
             continue
             
+        # Only migrate from the Video folder
+        if "Video" not in source_path:
+            continue
+            
         source_path = translate_path(source_path)
         is_movie = item.get("Type") == "Movie"
         
@@ -84,4 +88,4 @@ def migrate_items(dry_run=True):
                 print(f"File not found: {source_path}")
 
 if __name__ == "__main__":
-    migrate_items(dry_run=False)
+    migrate_items(dry_run=True)
