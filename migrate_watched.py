@@ -31,10 +31,9 @@ headers = {
     "Content-Type": "application/json"
 }
 
-def get_watched_items():
+def get_all_items():
     url = f"{JELLYFIN_URL}/Users/{USER_ID}/Items"
     params = {
-        "Filters": "IsPlayed",
         "Recursive": "true",
         "IncludeItemTypes": "Movie,Episode",
         "Fields": "Path"
@@ -42,11 +41,17 @@ def get_watched_items():
     response = requests.get(url, headers=headers, params=params)
     return response.json().get("Items", [])
 
+def is_downloading(path):
+    # Check if file is in active downloads (simplified check against running processes/logs)
+    # This logic assumes the download path is inside the project and not yet finished
+    # In a production scenario, query Jellyfin/system logs for lockfiles
+    return "downloading" in path or os.path.exists(path + ".part")
+
 def migrate_items(dry_run=True):
-    watched = get_watched_items()
-    for item in watched:
+    items = get_all_items()
+    for item in items:
         source_path = item.get("Path")
-        if not source_path:
+        if not source_path or is_downloading(source_path):
             continue
             
         source_path = translate_path(source_path)
@@ -60,7 +65,6 @@ def migrate_items(dry_run=True):
         
         relative_path = os.path.relpath(source_path, source_base)
         
-        # Clean path parts to avoid filesystem errors
         parts = relative_path.split(os.sep)
         clean_parts = [clean_filename(p) for p in parts]
         
@@ -74,7 +78,6 @@ def migrate_items(dry_run=True):
         if not dry_run:
             if os.path.exists(source_path):
                 os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-                # Use copy2 then remove to handle cross-device moves
                 shutil.copy2(source_path, dest_path)
                 os.remove(source_path)
             else:
