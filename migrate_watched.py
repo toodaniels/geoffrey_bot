@@ -63,6 +63,10 @@ def migrate_items(dry_run=True):
         # Clean path parts to avoid filesystem errors
         parts = relative_path.split(os.sep)
         clean_parts = [clean_filename(p) for p in parts]
+        
+        # Enforce S1 for Season 0
+        clean_parts = ["Season 1" if p == "Season 0" else p for p in clean_parts]
+        
         dest_path = os.path.join(target_base, *clean_parts)
         
         print(f"{'[DRY RUN] ' if dry_run else ''}Migrating {item.get('Type')}: {source_path} -> {dest_path}")
