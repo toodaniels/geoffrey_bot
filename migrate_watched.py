@@ -88,4 +88,4 @@ def migrate_items(dry_run=True):
                 print(f"File not found: {source_path}")
 
 if __name__ == "__main__":
-    migrate_items(dry_run=True)
+    migrate_items(dry_run=False)
