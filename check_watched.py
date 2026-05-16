@@ -9,7 +9,7 @@ API_KEY = os.getenv("JELLYFIN_API_KEY")
 # Assuming the jellyfin host is reachable at http://myjellyfin:8096 or localhost:8096
 # Since we are running inside or beside the container, localhost is usually fine
 JELLYFIN_URL = "http://localhost:8096"
-USER_ID = "4ae86364dc094a09b6b1aa0f655d6f2e" # Actual UUID found for toodaniels
+USER_ID = os.getenv("JELLYFIN_USER_ID")
 
 headers = {
     "X-Emby-Token": API_KEY,
