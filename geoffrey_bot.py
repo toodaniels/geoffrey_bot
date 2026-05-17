@@ -65,20 +65,27 @@ async def download_progress(msg_reply, downloading_txt, received_bytes, total):
     
     # Only update if:
     # 1. This is the first update for this message, or
-    # 2. At least 2 seconds have passed since last update, or
-    # 3. The progress has increased by at least 2%, or
+    # 2. At least 5 seconds have passed since last update, or
+    # 3. The progress has increased by at least 5%, or
     # 4. The download is complete
     last_update = download_progress.last_update.get(msg_id, 0)
     last_percent = download_progress.last_percent.get(msg_id, -1)
     
     should_update = (
         last_percent == -1 or  # First update
-        current_time - last_update >= 2.0 or  # At least 2 seconds since last update
-        current_percent >= last_percent + 2 or  # At least 2% progress
+        current_time - last_update >= 5.0 or  # At least 5 seconds since last update
+        current_percent >= last_percent + 5 or  # At least 5% progress
         received_bytes >= total  # Download complete
     )
     
     if should_update:
+        # Check if we are in a flood wait cooldown for this message
+        if hasattr(download_progress, 'flood_cooldown') and msg_id in download_progress.flood_cooldown:
+            if current_time < download_progress.flood_cooldown[msg_id]:
+                return
+            else:
+                download_progress.flood_cooldown.pop(msg_id)
+
         download_progress.last_update[msg_id] = current_time
         download_progress.last_percent[msg_id] = current_percent
         
@@ -102,8 +109,16 @@ async def download_progress(msg_reply, downloading_txt, received_bytes, total):
                 f"{speed}"
             )
         except Exception as e:
-            if "message not modified" not in str(e).lower() and "A wait of" not in str(e):
-                print(f"Error updating progress: {str(e)}")
+            err_str = str(e)
+            if "message not modified" not in err_str.lower():
+                if "A wait of" in err_str:
+                    # If we hit a flood wait, stop updating this message for 30 seconds
+                    if not hasattr(download_progress, 'flood_cooldown'):
+                        download_progress.flood_cooldown = {}
+                    download_progress.flood_cooldown[msg_id] = current_time + 30
+                    print(f"Flood wait detected, silencing progress for 30s: {err_str}")
+                else:
+                    print(f"Error updating progress: {err_str}")
     
     # Update speed calculation data
     download_progress.last_bytes = received_bytes
