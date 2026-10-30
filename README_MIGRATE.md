@@ -1,6 +1,6 @@
 # Migrate Watched Media
 
-This script automates the migration of media files marked as "watched" in Jellyfin from temporary download directories to the final storage disk (exFAT, `/mnt/avivo`).
+This script automates the migration of media files marked as "watched" in Jellyfin from temporary download directories to the final storage disk (exFAT, `/mnt/media`).
 
 ## Requirements
 
@@ -15,9 +15,9 @@ Create a `.env` file in the root with the following variable:
 `JELLYFIN_API_KEY=your_api_key_here`
 
 Variables configured by default in the script:
-- `USER_ID`: 4ae86364dc094a09b6b1aa0f655d6f2e
-- `SOURCE_BASE_SERIES`: `/home/toodaniels/Documents/geoffrey_telegram/downloads/Series`
-- `TARGET_BASE_SERIES`: `/mnt/avivo/Series`
+- `USER_ID`: `your_jellyfin_user_id`
+- `SOURCE_BASE_SERIES`: `/path/to/downloads/Series`
+- `TARGET_BASE_SERIES`: `/mnt/media/Series`
 
 ## How It Works
 
@@ -36,4 +36,4 @@ The script is configured to run in real mode (no dry-run).
 ```bash
 python migrate_watched.py
 ```
-*Note: Make sure you have read permissions on the source and write permissions on the `/mnt/avivo` destination.*
+*Note: Make sure you have read permissions on the source and write permissions on the `/mnt/media` destination.*

@@ -3,7 +3,7 @@
 Web interface to view and control the user's containers (`geoffrey-bot`,
 `myjellyfin`, `homeassistant`, …) on this server.
 
-- **LAN URL:** http://192.168.1.91:3552
+- **LAN URL:** http://192.168.1.100:3552
 - **First login:** `arcane` / `arcane-admin` → **change the password on first access**
 - **Management:** user systemd (Quadlet), not `podman compose`
 
@@ -11,7 +11,7 @@ Web interface to view and control the user's containers (`geoffrey-bot`,
 
 - Arcane manages *stacks*. Within the stack it manages, a redeploy would
   recreate itself in the middle of the operation.
-- `compose.yml` (bot-only, without the `/mnt/avivo` mount) takes precedence over
+- `compose.yml` (bot-only, without the `/mnt/media` mount) takes precedence over
   `docker-compose.yml`. Any `podman compose up -d` in the root is a
   gamble for the three containers that already work.
 - Different lifecycle: updating the panel should not restart downloads or

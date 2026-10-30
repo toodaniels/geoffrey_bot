@@ -21,7 +21,7 @@ graph TB
         M[downloads/Music/]
         S[downloads/Series/]
         MV[downloads/Movies/]
-        ARC[/mnt/avivo archive]
+        ARC[/mnt/media archive]
     end
 
     subgraph "⚙️ Processing"
@@ -84,7 +84,7 @@ graph TB
 | Script | Frequency | Role |
 |---|---|---|
 | `jellyfin_headless.py` | Every 6h | Scans `Video/`, parses episodes, renames and moves them to `Series/` or `Movies/` |
-| `migrate_watched.py` | Daily at 12 AM | Queries played items from Jellyfin, copies them to `/mnt/avivo`, deletes the original |
+| `migrate_watched.py` | Daily at 12 AM | Queries played items from Jellyfin, copies them to `/mnt/media`, deletes the original |
 
 ### 3. Distribution
 

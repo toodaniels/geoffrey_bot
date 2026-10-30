@@ -146,7 +146,7 @@ Creates a task with status `PENDING`.
 **Body:**
 ```json
 {
-  "user_id": 1448666148,
+  "user_id": 123456789,
   "message_id": 12345,
   "file_name": "video.mp4",
   "file_size_bytes": 1048576
