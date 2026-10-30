@@ -31,6 +31,11 @@ app = FastAPI(
 )
 
 
+@app.get("/health", include_in_schema=False)
+def health():
+    return {"status": "ok"}
+
+
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def dashboard():
     index_path = TEMPLATES_DIR / "index.html"
