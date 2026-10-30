@@ -1,0 +1,4 @@
+# Estado de Arcane (SQLite, config, logs) y clave de cifrado: nunca a git
+data/
+projects/
+.env

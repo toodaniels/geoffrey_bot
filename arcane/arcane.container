@@ -1,0 +1,26 @@
+[Unit]
+Description=Arcane - panel web de gestion de contenedores (Podman rootless)
+Documentation=file:/home/toodaniels/Documents/geoffrey_telegram/arcane/README.md
+Requires=podman.socket
+After=podman.socket
+
+[Container]
+Image=ghcr.io/getarcaneapp/manager:latest
+ContainerName=arcane
+PublishPort=3552:3552
+# Socket de podman del usuario (rootless). El root del contenedor mapea al uid 1000
+# del host, asi que puede leer este socket sin userns=keep-id.
+Volume=/run/user/1000/podman/podman.sock:/var/run/docker.sock
+# Estado de Arcane dentro de la carpeta (entra en los backups de arcane/)
+Volume=/home/toodaniels/Documents/geoffrey_telegram/arcane/data:/app/data
+# ENCRYPTION_KEY, APP_URL, PROJECTS_DIRECTORY (chmod 600, fuera de git)
+EnvironmentFile=/home/toodaniels/Documents/geoffrey_telegram/arcane/.env
+# Metricas reales del host en vez de las del cgroup anidado
+PodmanArgs=--cgroupns=host
+
+[Service]
+Restart=always
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target
