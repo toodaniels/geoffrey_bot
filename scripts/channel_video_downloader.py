@@ -42,7 +42,7 @@ class TelegramChannelVideoDownloader:
     def send_status_message(self, message):
         return
         with self.bot_client as client:
-            client.send_message('toodaniels', message)
+            client.send_message(os.getenv('TELEGRAM_USERNAME', 'your_username'), message)
 
     def define_file_name(self, title):
         title = title.strip()\

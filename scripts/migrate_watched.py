@@ -12,8 +12,8 @@ JELLYFIN_URL = "http://localhost:8096"
 USER_ID = os.getenv("JELLYFIN_USER_ID")
 SOURCE_BASE_SERIES = os.getenv("SOURCE_BASE_SERIES")
 SOURCE_BASE_MOVIES = os.getenv("SOURCE_BASE_MOVIES")
-TARGET_BASE_SERIES = "/mnt/avivo/Series"
-TARGET_BASE_MOVIES = "/mnt/avivo/Movies"
+TARGET_BASE_SERIES = os.getenv("TARGET_BASE_SERIES", "/mnt/media/Series")
+TARGET_BASE_MOVIES = os.getenv("TARGET_BASE_MOVIES", "/mnt/media/Movies")
 
 def clean_filename(filename):
     # Remove characters incompatible with exFAT/Windows
