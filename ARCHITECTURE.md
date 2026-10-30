@@ -1,22 +1,22 @@
-# Geoffrey — Arquitectura del Ecosistema
+# Geoffrey — Ecosystem Architecture
 
-> Sistema personal de reemplazo de servicios de streaming (Netflix, Spotify, etc.)
-> basado en Telegram + Jellyfin + Syncthing.
+> Personal streaming-service replacement (Netflix, Spotify, etc.)
+> built on Telegram + Jellyfin + Syncthing.
 
 ---
 
-## Diagrama de Arquitectura
+## Architecture Diagram
 
 ```mermaid
 graph TB
-    subgraph "📡 Ingesta"
-        TG[Usuario Telegram]
+    subgraph "📡 Ingest"
+        TG[Telegram User]
         BOT[geoffrey_bot.py<br/>Telethon MTProto]
         API[FastAPI :8000<br/>SQLite + WebSocket]
-        DASH[Dashboard Web<br/>Tailwind + WS]
+        DASH[Web Dashboard<br/>Tailwind + WS]
     end
 
-    subgraph "💾 Almacenamiento"
+    subgraph "💾 Storage"
         V[downloads/Video/]
         M[downloads/Music/]
         S[downloads/Series/]
@@ -24,122 +24,121 @@ graph TB
         ARC[/mnt/avivo archive]
     end
 
-    subgraph "⚙️ Procesamiento"
-        JFH[jellyfin_headless.py<br/>cada 6h]
-        MW[migrate_watched.py<br/>diario 12am]
+    subgraph "⚙️ Processing"
+        JFH[jellyfin_headless.py<br/>every 6h]
+        MW[migrate_watched.py<br/>daily at 12am]
     end
 
-    subgraph "📤 Distribución"
+    subgraph "📤 Distribution"
         JF[Jellyfin :8096]
         ST[Syncthing]
         SMB[SMB Share]
     end
 
-    subgraph "📱 Clientes"
-        AIMP_MOBILE[AIMP Móvil<br/>vía Syncthing]
-        AIMP_PC[AIMP Remoto<br/>vía SMB]
-        JF_CLIENT[Jellyfin Client<br/>Web / TV / Móvil]
+    subgraph "📱 Clients"
+        AIMP_MOBILE[AIMP Mobile<br/>via Syncthing]
+        AIMP_PC[AIMP Remote<br/>via SMB]
+        JF_CLIENT[Jellyfin Client<br/>Web / TV / Mobile]
     end
 
-    %% Flujo principal
-    TG -->|envía archivo| BOT
-    BOT -->|MIME clasifica| V
-    BOT -->|MIME clasifica| M
+    %% Main flow
+    TG -->|sends file| BOT
+    BOT -->|MIME classifies| V
+    BOT -->|MIME classifies| M
     BOT -->|POST /tasks| API
-    API -->|sirve| DASH
+    API -->|serves| DASH
     DASH -->|WS updates| API
 
     %% Video pipeline
-    V -->|cada 6h| JFH
+    V -->|every 6h| JFH
     JFH -->|rename & move| S
     JFH -->|fallback| MV
     S --> JF
     MV --> JF
     JF -->|watched items| MW
-    MW -->|copia + elimina| ARC
+    MW -->|copy + delete| ARC
 
-    %% Música pipeline
+    %% Music pipeline
     M --> ST
     M --> SMB
     M --> JF
-    ST -->|sincroniza| AIMP_MOBILE
-    SMB -->|lectura remota| AIMP_PC
+    ST -->|syncs| AIMP_MOBILE
+    SMB -->|remote read| AIMP_PC
     JF -->|streaming| JF_CLIENT
 ```
 
 ---
 
-## Capas del Sistema
+## System Layers
 
-### 1. Ingesta (Telegram)
+### 1. Ingest (Telegram)
 
-| Componente | Tecnología | Función |
+| Component | Technology | Role |
 |---|---|---|
-| Bot | `Telethon` (MTProto) | Recibe archivos, clasifica por MIME, encola descargas |
-| API | `FastAPI` + `SQLite` | Centraliza estado de descargas, evita FloodWait |
-| Dashboard | Tailwind + WebSocket | Monitoreo en vivo de descargas |
+| Bot | `Telethon` (MTProto) | Receives files, classifies by MIME, queues downloads |
+| API | `FastAPI` + `SQLite` | Centralizes download state, avoids FloodWait |
+| Dashboard | Tailwind + WebSocket | Live download monitoring |
 
-### 2. Procesamiento
+### 2. Processing
 
-| Script | Frecuencia | Función |
+| Script | Frequency | Role |
 |---|---|---|
-| `jellyfin_headless.py` | Cada 6h | Escanea `Video/`, parsea episodios, renombra y mueve a `Series/` o `Movies/` |
-| `migrate_watched.py` | Diario 12 AM | Consulta Jellyfin items reproducidos, copia a `/mnt/avivo`, elimina original |
+| `jellyfin_headless.py` | Every 6h | Scans `Video/`, parses episodes, renames and moves them to `Series/` or `Movies/` |
+| `migrate_watched.py` | Daily at 12 AM | Queries played items from Jellyfin, copies them to `/mnt/avivo`, deletes the original |
 
-### 3. Distribución
+### 3. Distribution
 
-| Servicio | Acceso | Propósito |
+| Service | Access | Purpose |
 |---|---|---|
-| **Jellyfin** (`:8096`) | Web, TV, móvil | Catálogo de series, películas y música |
-| **Syncthing** | Red local | Sincroniza música al móvil |
-| **SMB** | Red local | Lectura remota de MP3s desde AIMP en PC |
+| **Jellyfin** (`:8096`) | Web, TV, mobile | Catalog of series, movies and music |
+| **Syncthing** | Local network | Syncs music to the phone |
+| **SMB** | Local network | Remote reading of MP3s from AIMP on PC |
 
-### 4. Clientes
+### 4. Clients
 
-| Dispositivo | App | Fuente |
+| Device | App | Source |
 |---|---|---|
-| Móvil | AIMP | Syncthing (offline) |
-| PC remoto | AIMP | SMB (streaming local) |
-| Cualquiera | Jellyfin Web / Finamp / Gelli | Jellyfin API |
+| Mobile | AIMP | Syncthing (offline) |
+| Remote PC | AIMP | SMB (local streaming) |
+| Any | Jellyfin Web / Finamp / Gelli | Jellyfin API |
 
 ---
 
-## Stack Tecnológico
+## Technology Stack
 
-- **Lenguaje:** Python 3.11+
+- **Language:** Python 3.11+
 - **Runtime:** Docker / docker-compose
 - **Bot:** Telethon (Telegram MTProto)
 - **API:** FastAPI + SQLModel + SQLite
 - **Media Server:** Jellyfin
-- **Sincronización:** Syncthing
-- **Red:** SMB/CIFS
-- **Dash:** Tailwind CSS + WebSocket
+- **Sync:** Syncthing
+- **Network:** SMB/CIFS
+- **Dashboard:** Tailwind CSS + WebSocket
 
 ---
 
-## Flujo de Datos
+## Data Flow
 
 ```
-Usuario envía archivo → Telegram
+User sends file → Telegram
          ↓
-geoffrey_bot.py recibe vía MTProto
+geoffrey_bot.py receives it via MTProto
          ↓
-Clasifica: Video → downloads/Video/
-           Música → downloads/Music/
-           Documento → downloads/Documents/
+Classifies: Video → downloads/Video/
+            Music → downloads/Music/
+            Document → downloads/Documents/
          ↓
-Registra tarea en API (PENDING) → SQLite
+Registers task in API (PENDING) → SQLite
          ↓
-download_worker descarga con progreso (PATCH cada 3s)
+download_worker downloads with progress (PATCH every 3s)
          ↓
-COMPLETED → WebSocket broadcast al dashboard
+COMPLETED → WebSocket broadcast to the dashboard
 ```
 
-## Música: Distribución sin Streaming Central
+## Music: Distribution Without Central Streaming
 
-La música no requiere un servidor de streaming dedicado:
+Music does not require a dedicated streaming server:
 
-1. **Syncthing** replica `downloads/Music/` al móvil → AIMP reproduce local
-2. **SMB** exporta la misma carpeta → AIMP remoto lee directo del servidor
-3. **Jellyfin** también indexa la carpeta como biblioteca musical (fallback)
-
+1. **Syncthing** replicates `downloads/Music/` to the phone → AIMP plays it locally
+2. **SMB** exports the same folder → remote AIMP reads directly from the server
+3. **Jellyfin** also indexes the folder as a music library (fallback)

@@ -108,17 +108,17 @@ geoffrey_telegram/
     └── Documents/    # Documents
 ```
 
-## API Centralizada de Descargas (Nuevo)
+## Centralized Download API (New)
 
-Se introdujo una API REST centralizada (`api/`) para desacoplar el reporte de progreso de descargas de Telegram, eliminando los problemas de `FloodWait` y rate-limiting.
+A centralized REST API (`api/`) was introduced to decouple download progress reporting from Telegram, eliminating `FloodWait` and rate-limiting issues.
 
 ### Stack
 
 - **FastAPI** + **SQLModel** (SQLAlchemy + Pydantic)
-- Base de datos **SQLite** (`geoffrey.db`)
-- Documentación interactiva en `/docs` (Swagger UI) y `/redoc` (ReDoc)
+- **SQLite** database (`geoffrey.db`)
+- Interactive documentation at `/docs` (Swagger UI) and `/redoc` (ReDoc)
 
-### Ejecutar la API
+### Running the API
 
 ```bash
 poetry run uvicorn api.main:app --host 0.0.0.0 --port 8000
@@ -126,12 +126,12 @@ poetry run uvicorn api.main:app --host 0.0.0.0 --port 8000
 
 ### Endpoints
 
-| Método | Ruta | Descripción |
+| Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/tasks` | Registrar una nueva tarea de descarga |
-| `PATCH` | `/tasks/{task_id}` | Actualizar progreso/estado de una tarea |
+| `POST` | `/tasks` | Register a new download task |
+| `PATCH` | `/tasks/{task_id}` | Update a task's progress/status |
 
-### Diagrama de flujo de estados
+### State Flow Diagram
 
 ```
 PENDING → DOWNLOADING → COMPLETED
@@ -141,7 +141,7 @@ PENDING → DOWNLOADING → COMPLETED
 
 ### `POST /tasks`
 
-Crea una tarea con estado `PENDING`.
+Creates a task with status `PENDING`.
 
 **Body:**
 ```json
@@ -164,7 +164,7 @@ Crea una tarea con estado `PENDING`.
 
 ### `PATCH /tasks/{task_id}`
 
-Actualiza parcialmente una tarea (todos los campos son opcionales).
+Updates a task partially (all fields are optional).
 
 **Body:**
 ```json
@@ -175,23 +175,23 @@ Actualiza parcialmente una tarea (todos los campos son opcionales).
 }
 ```
 
-**Response (200):** Objeto `DownloadTask` completo.
+**Response (200):** Full `DownloadTask` object.
 
-### Modelo `DownloadTask`
+### `DownloadTask` Model
 
-| Campo | Tipo | Descripción |
+| Field | Type | Description |
 |-------|------|-------------|
-| `task_id` | UUID (PK) | Identificador único |
-| `user_id` | int | ID del usuario de Telegram |
-| `message_id` | int | ID del mensaje en Telegram |
-| `file_name` | string | Nombre del archivo |
-| `file_size_bytes` | int? | Tamaño en bytes |
+| `task_id` | UUID (PK) | Unique identifier |
+| `user_id` | int | Telegram user ID |
+| `message_id` | int | Telegram message ID |
+| `file_name` | string | File name |
+| `file_size_bytes` | int? | Size in bytes |
 | `status` | enum | `PENDING` / `DOWNLOADING` / `COMPLETED` / `FAILED` / `CANCELLED` |
-| `progress` | float (0.0-1.0) | Progreso de la descarga |
-| `downloaded_bytes` | int | Bytes descargados |
-| `error_message` | string? | Mensaje de error si falló |
-| `created_at` | datetime | Fecha de creación |
-| `updated_at` | datetime | Fecha de última actualización |
+| `progress` | float (0.0-1.0) | Download progress |
+| `downloaded_bytes` | int | Bytes downloaded |
+| `error_message` | string? | Error message if it failed |
+| `created_at` | datetime | Creation date |
+| `updated_at` | datetime | Last update date |
 
 ### Tests
 
@@ -199,47 +199,47 @@ Actualiza parcialmente una tarea (todos los campos son opcionales).
 poetry run python -m unittest api.test_main
 ```
 
-### Ejecutar en Desarrollo
+### Running in Development
 
-Para correr ambos servicios localmente, necesitas dos terminales:
+To run both services locally, you need two terminals:
 
 **Terminal 1 — API:**
 ```bash
 poetry run uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-El flag `--reload` reinicia el servidor automáticamente al detectar cambios en el código.
+The `--reload` flag restarts the server automatically when it detects code changes.
 
 **Terminal 2 — Bot:**
 ```bash
 DEVELOPMENT=1 poetry run python geoffrey_bot.py
 ```
-La variable `DEVELOPMENT=1` hace que el bot cargue automáticamente el archivo `.env` (ver `AGENTS.md` para más detalles).
+The `DEVELOPMENT=1` variable makes the bot load the `.env` file automatically (see `AGENTS.md` for details).
 
-El bot se conecta a la API en `http://localhost:8000` por defecto. Asegúrate de que la API esté corriendo antes de iniciar el bot.
+The bot connects to the API at `http://localhost:8000` by default. Make sure the API is running before starting the bot.
 
 ---
 
 
 
-## Cambios Recientes en el Bot
+## Recent Bot Changes
 
-### Refactor: Desacoplamiento del reporte de progreso (`43f9ca2`)
+### Refactor: Decoupling progress reporting (`43f9ca2`)
 
-El bot solía editar los mensajes de Telegram en cada actualización de progreso, lo que provocaba bloqueos por `FloodWait`. Ahora:
+The bot used to edit Telegram messages on every progress update, which caused `FloodWait` blocks. Now:
 
-1. **Registro centralizado:** Al iniciar una descarga, el bot hace `POST /tasks` para registrar la tarea en la API y recibe un `task_id`.
-2. **Reporte throttleado:** El progreso se envía vía `PATCH /tasks/{task_id}` cada **3 segundos** como máximo, usando `aiohttp` de forma asíncrona.
-3. **Estados finales:** Al completarse, envía `COMPLETED` con `progress=1.0`; si falla o expira el timeout (6h), envía `FAILED`.
-4. **Mensajes de Telegram:** Ahora son secondarios (best-effort); si fallan por `FloodWait`, se registran en log sin afectar la descarga.
+1. **Centralized registration:** When a download starts, the bot calls `POST /tasks` to register the task in the API and receives a `task_id`.
+2. **Throttled reporting:** Progress is sent via `PATCH /tasks/{task_id}` every **3 seconds** at most, using `aiohttp` asynchronously.
+3. **Final states:** On completion, it sends `COMPLETED` with `progress=1.0`; if it fails or the timeout expires (6h), it sends `FAILED`.
+4. **Telegram messages:** They are now secondary (best-effort); if they fail due to `FloodWait`, they are logged without affecting the download.
 
-### Dependencias añadidas
+### Added dependencies
 
-- `aiohttp` — Cliente HTTP asíncrono para comunicarse con la API
-- `fastapi` + `sqlmodel` + `uvicorn` — Servidor y ORM para la API centralizada
+- `aiohttp` — Async HTTP client for communicating with the API
+- `fastapi` + `sqlmodel` + `uvicorn` — Server and ORM for the centralized API
 
-### Variables de entorno
+### Environment variables
 
-Además de las existentes, la API se configura por defecto en `http://localhost:8000` (constante `API_BASE_URL` en `geoffrey_bot.py`). Para producción, se puede modificar o leer de variable de entorno.
+In addition to the existing ones, the API is configured at `http://localhost:8000` by default (the `API_BASE_URL` constant in `geoffrey_bot.py`). For production, it can be changed or read from an environment variable.
 
 ## Troubleshooting
 
