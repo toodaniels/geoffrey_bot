@@ -124,10 +124,24 @@ A centralized REST API (`api/`) was introduced to decouple download progress rep
 poetry run uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
 
+### Running the API with Docker Compose
+
+The API has its own image (`api/Dockerfile`, based on `python:3.11-slim`) and is defined as the `geoffrey-api` service in the general `docker-compose.yml`. It exposes port `8000` and bind-mounts `geoffrey.db` so tasks survive container recreations.
+
+```bash
+docker compose build geoffrey-api
+docker compose up -d geoffrey-api
+# or run the whole stack
+docker compose up -d
+```
+
+The container exposes a `/health` endpoint, used by the Compose healthcheck. The bot reaches the API through the host gateway (`API_BASE_URL` in `.env`), so it keeps working without being recreated.
+
 ### Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/health` | Health probe used by Docker/Compose |
 | `POST` | `/tasks` | Register a new download task |
 | `PATCH` | `/tasks/{task_id}` | Update a task's progress/status |
 
