@@ -1,255 +1,552 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Geoffrey Downloads</title>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      background: #0d1117;
-      color: #c9d1d9;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
-      min-height: 100vh;
-      padding: 2rem 1rem;
-    }
-    .container { max-width: 800px; margin: 0 auto; }
-    header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 2rem; padding-bottom: 1rem;
-      border-bottom: 1px solid #21262d;
-    }
-    h1 { font-size: 1.5rem; font-weight: 600; }
-    #status-badge {
-      font-size: 0.75rem; padding: 0.25rem 0.75rem;
-      border-radius: 9999px; background: #21262d; color: #8b949e;
-    }
-    #status-badge.connected { background: #1f6f31; color: #7ee787; }
-    #status-badge.disconnected { background: #21262d; color: #8b949e; }
-    #status-badge.error { background: #792e2e; color: #ff7b72; }
-
-    .empty-state {
-      text-align: center; padding: 3rem 1rem; color: #484f58;
-    }
-    .empty-state p { font-size: 1.1rem; }
-
-    .task-card {
-      background: #161b22; border: 1px solid #21262d;
-      border-radius: 8px; padding: 1rem 1.25rem;
-      margin-bottom: 0.75rem; transition: border-color 0.2s;
-    }
-    .task-card:hover { border-color: #30363d; }
-
-    .task-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 0.5rem; gap: 1rem;
-    }
-    .task-name {
-      font-size: 0.9rem; font-weight: 500; white-space: nowrap;
-      overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
-    }
-    .task-status {
-      font-size: 0.7rem; font-weight: 600; text-transform: uppercase;
-      padding: 0.15rem 0.5rem; border-radius: 4px; white-space: nowrap;
-    }
-    .status-PENDING    { background: #21262d; color: #8b949e; }
-    .status-DOWNLOADING { background: #1f6f3133; color: #7ee787; }
-    .status-UPLOADING   { background: #1f6f3133; color: #7ee787; }
-    .status-COMPLETED   { background: #1f6f31; color: #7ee787; }
-    .status-FAILED      { background: #792e2e; color: #ff7b72; }
-    .status-CANCELLED   { background: #21262d; color: #484f58; }
-
-    .progress-bar-track {
-      width: 100%; height: 6px; background: #21262d; border-radius: 9999px;
-      overflow: hidden; margin-bottom: 0.4rem;
-    }
-    .progress-bar-fill {
-      height: 100%; width: 0%; background: #58a6ff;
-      border-radius: 9999px; transition: width 0.4s ease-in-out;
-    }
-    .progress-bar-fill.completed { background: #3fb950; }
-    .progress-bar-fill.failed { background: #f85149; }
-
-    .task-meta {
-      display: flex; align-items: center; justify-content: space-between;
-      font-size: 0.75rem; color: #484f58;
-    }
-    .task-meta .bytes { font-variant-numeric: tabular-nums; }
-
-    .connection-toast {
-      position: fixed; bottom: 1.5rem; right: 1.5rem;
-      background: #21262d; color: #c9d1d9; padding: 0.6rem 1rem;
-      border-radius: 8px; font-size: 0.8rem; opacity: 0;
-      transition: opacity 0.3s; pointer-events: none;
-    }
-    .connection-toast.show { opacity: 1; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <header>
-      <h1>Geoffrey Downloads</h1>
-      <span id="status-badge" class="disconnected">Disconnected</span>
-    </header>
-    <div id="task-list"></div>
-  </div>
-  <div id="toast" class="connection-toast"></div>
-
-  <script>
-    const taskList = document.getElementById('task-list');
-    const badge = document.getElementById('status-badge');
-    const toast = document.getElementById('toast');
-
-    function fmtBytes(bytes) {
-      if (bytes == null) return '';
-      const units = ['B', 'KB', 'MB', 'GB'];
-      let i = 0; let v = bytes;
-      while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-      return v.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
-    }
-
-    function fmtPct(pct) {
-      return (pct * 100).toFixed(1) + '%';
-    }
-
-    function statusClass(status) {
-      return 'status-' + (status || 'PENDING');
-    }
-
-    function fillClass(status) {
-      if (status === 'COMPLETED') return 'completed';
-      if (status === 'FAILED' || status === 'CANCELLED') return 'failed';
-      return '';
-    }
-
-    function cardId(taskId) {
-      return 'task-' + taskId;
-    }
-
-    function renderTask(task) {
-      const id = cardId(task.task_id);
-      const exists = document.getElementById(id);
-      const pct = task.progress || 0;
-      const pctText = task.status === 'COMPLETED' ? '100%' : fmtPct(pct);
-      const bytesText = task.downloaded_bytes != null
-        ? fmtBytes(task.downloaded_bytes) + (task.file_size_bytes ? ' / ' + fmtBytes(task.file_size_bytes) : '')
-        : '';
-
-      const html =
-        `<div class="task-header">
-          <span class="task-name" title="${escapeHtml(task.file_name)}">${escapeHtml(task.file_name)}</span>
-          <span class="task-status ${statusClass(task.status)}">${task.status}</span>
-        </div>
-        <div class="progress-bar-track">
-          <div class="progress-bar-fill ${fillClass(task.status)}" style="width: ${pct * 100}%"></div>
-        </div>
-        <div class="task-meta">
-          <span class="bytes">${bytesText}</span>
-          <span>${pctText}</span>
-        </div>`;
-
-      if (exists) {
-        exists.innerHTML = html;
-      } else {
-        const card = document.createElement('div');
-        card.id = id;
-        card.className = 'task-card';
-        card.innerHTML = html;
-        taskList.appendChild(card);
-      }
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
-    function showToast(msg) {
-      toast.textContent = msg;
-      toast.classList.add('show');
-      clearTimeout(toast._hide);
-      toast._hide = setTimeout(() => toast.classList.remove('show'), 3000);
-    }
-
-    function setConnected(ok) {
-      badge.textContent = ok ? 'Connected' : 'Disconnected';
-      badge.className = ok ? 'connected' : 'disconnected';
-    }
-
-    const TERMINAL_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED'];
-
-    function fetchActiveTasks() {
-      fetch('/tasks/active')
-        .then(r => r.json())
-        .then(tasks => {
-          taskList.innerHTML = '';
-          if (tasks.length === 0) {
-            taskList.innerHTML = '<div class="empty-state"><p>No active downloads</p></div>';
-            return;
-          }
-          tasks.forEach(renderTask);
-        })
-        .catch(() => {
-          taskList.innerHTML = '<div class="empty-state"><p>Could not load tasks</p></div>';
-        });
-    }
-
-    // --- Fetch active tasks on load ---
-    fetchActiveTasks();
-
-    // --- WebSocket connection ---
-    let ws = null;
-    let reconnectTimer = null;
-
-    function connectWS() {
-      if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
-
-      const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-      const url = protocol + '://' + location.host + '/ws';
-      ws = new WebSocket(url);
-
-      ws.onopen = () => {
-        setConnected(true);
-        showToast('Connected');
-        fetchActiveTasks();
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (TERMINAL_STATUSES.includes(data.status)) {
-            fetchActiveTasks();
-          } else {
-            const empty = taskList.querySelector('.empty-state');
-            if (empty) empty.remove();
-            renderTask(data);
-          }
-        } catch (e) {
-          console.warn('WS parse error', e);
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Geoffrey Downloads - Your Personal Media Butler</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;600;700&amp;family=Inter:wght@400;500&amp;family=JetBrains+Mono:wght@500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-secondary": "#3c0091",
+                        "surface-container-highest": "#2d3449",
+                        "primary-fixed-dim": "#4ae176",
+                        "on-secondary-fixed": "#23005c",
+                        "surface-tint": "#4ae176",
+                        "on-primary-container": "#004b1e",
+                        "on-background": "#dae2fd",
+                        "inverse-surface": "#dae2fd",
+                        "primary-fixed": "#6bff8f",
+                        "tertiary": "#ffba61",
+                        "on-tertiary-container": "#5c3800",
+                        "on-primary-fixed-variant": "#005321",
+                        "error": "#ffb4ab",
+                        "on-error": "#690005",
+                        "inverse-primary": "#006e2f",
+                        "tertiary-container": "#ef9900",
+                        "surface-dim": "#0b1326",
+                        "on-tertiary-fixed-variant": "#653e00",
+                        "on-tertiary-fixed": "#2a1700",
+                        "background": "#0b1326",
+                        "surface-container-high": "#222a3d",
+                        "on-primary-fixed": "#002109",
+                        "surface-container-low": "#131b2e",
+                        "surface-container-lowest": "#060e20",
+                        "error-container": "#93000a",
+                        "on-tertiary": "#472a00",
+                        "surface-container": "#171f33",
+                        "tertiary-fixed-dim": "#ffb95f",
+                        "on-primary": "#003915",
+                        "secondary-container": "#571bc1",
+                        "inverse-on-surface": "#283044",
+                        "on-surface-variant": "#bccbb9",
+                        "secondary-fixed-dim": "#d0bcff",
+                        "tertiary-fixed": "#ffddb8",
+                        "on-surface": "#dae2fd",
+                        "surface": "#0b1326",
+                        "secondary-fixed": "#e9ddff",
+                        "surface-bright": "#31394d",
+                        "on-error-container": "#ffdad6",
+                        "outline": "#869585",
+                        "on-secondary-container": "#c4abff",
+                        "primary": "#4be277",
+                        "outline-variant": "#3d4a3d",
+                        "on-secondary-fixed-variant": "#5516be",
+                        "primary-container": "#22c55e",
+                        "secondary": "#d0bcff",
+                        "surface-variant": "#2d3449"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "gutter": "16px",
+                        "container-padding": "24px",
+                        "max-width": "1200px",
+                        "stack-sm": "12px",
+                        "base": "8px",
+                        "stack-md": "24px"
+                    },
+                    "fontFamily": {
+                        "body-sm": ["Inter"],
+                        "display-lg": ["Hanken Grotesk"],
+                        "headline-md": ["Hanken Grotesk"],
+                        "headline-sm": ["Hanken Grotesk"],
+                        "body-lg": ["Inter"],
+                        "label-caps": ["JetBrains Mono"]
+                    },
+                }
+            }
         }
-      };
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .progress-shimmer {
+            background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .glass-header {
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            background-color: rgba(11, 19, 38, 0.8);
+        }
+    </style>
+</head>
+<body class="bg-background text-on-background font-body-lg min-h-screen">
+<!-- Sidebar Overlay (mobile) -->
+<div id="sidebar-overlay" class="fixed inset-0 bg-black/50 z-30 hidden md:hidden"></div>
+<!-- SideNavBar Component -->
+<aside id="sidebar" class="fixed left-0 top-0 h-full flex flex-col p-4 z-40 bg-surface-container-low dark:bg-surface-container-lowest border-r border-outline-variant w-64 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out">
+<!-- Header Section -->
+<div class="flex items-center gap-4 mb-8 px-2">
+<div class="relative">
+<img alt="Geoffrey Butler Portrait" class="w-12 h-12 rounded-full border-2 border-primary object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkd-B7JzLzRAIDus_g3L6GoY0g26ZbTeVNGmK1nQHmoMwr7coD3pWGTf58S-o2v9fIXUM9akG04J-9EhZd-sTTP4t3ivW1LscfPgGtXIVUCr6vUDD7gjrzGVpATVXmj6IJ1t3usfC5RtW0sb_bGmu4IdWd-rAOiXG8jUhrM85fstSH-9hu0KIMKejNvNmyFFrhFHUADn7P2xu_C1uc0HkDIIFrSUGykgYoJVK-mX5HbLYIur8VaSzQCrq-5pI1axeC2JJdSRRGeQI"/>
+<div class="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-surface-container-lowest"></div>
+</div>
+<div>
+<h2 class="text-headline-sm font-headline-sm font-semibold text-primary">Your Butler</h2>
+<p class="text-label-caps font-label-caps text-on-surface-variant opacity-80 uppercase">Ready to serve</p>
+</div>
+</div>
+<nav class="flex-1 space-y-2">
+<a class="flex items-center gap-3 px-4 py-3 bg-secondary-container dark:bg-on-secondary-fixed-variant text-on-secondary-container dark:text-secondary-fixed rounded-xl transition-all duration-200" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">list</span>
+<span class="text-label-caps font-label-caps">All Downloads</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-variant rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">movie</span>
+<span class="text-label-caps font-label-caps">Videos</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-variant rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">music_note</span>
+<span class="text-label-caps font-label-caps">Music</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-3 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high dark:hover:bg-surface-variant rounded-xl transition-all" href="#">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-label-caps font-label-caps">Settings</span>
+</a>
+</nav>
+<button class="mt-4 mb-8 bg-primary text-on-primary font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 hover:shadow-[0_0_15px_rgba(75,226,119,0.3)] transition-all active:scale-95">
+<span class="material-symbols-outlined">add</span>
+<span class="text-label-caps font-label-caps">Add URL</span>
+</button>
+<div class="border-t border-outline-variant pt-4 space-y-1">
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all rounded-xl" href="#">
+<span class="material-symbols-outlined">check_circle</span>
+<span class="text-label-caps font-label-caps">Completed</span>
+</a>
+<a class="flex items-center gap-3 px-4 py-2 text-on-surface-variant hover:text-on-surface hover:bg-surface-container-high transition-all rounded-xl" href="#">
+<span class="material-symbols-outlined">help_outline</span>
+<span class="text-label-caps font-label-caps">Help</span>
+</a>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="ml-0 md:ml-64 min-h-screen flex flex-col">
+<!-- TopAppBar Component -->
+<header class="sticky top-0 z-30 glass-header border-b border-outline-variant dark:border-outline-variant">
+<div class="flex justify-between items-center w-full px-4 md:px-container-padding h-16 md:h-20 max-w-max-width mx-auto">
+<div class="flex items-center gap-2 md:gap-4">
+<button id="menu-toggle" class="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<h1 class="text-sm md:text-headline-md font-headline-md font-bold text-on-surface truncate">Geoffrey Downloads</h1>
+<div id="connection-badge" class="hidden md:flex items-center gap-2 bg-primary/10 px-3 py-1 rounded-full border border-primary/20">
+<span class="relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+<span class="text-[10px] font-bold text-primary tracking-widest uppercase">Connected</span>
+</div>
+<span id="connection-dot" class="md:hidden relative flex h-2 w-2">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+</span>
+</div>
+<div class="flex items-center gap-2 md:gap-6">
+<div class="hidden md:block relative w-80">
+<input id="search-input" class="w-full bg-surface-container-lowest border border-outline-variant rounded-full py-2 pl-10 pr-4 text-on-surface focus:border-primary focus:ring-0 transition-all font-body-sm" placeholder="Search your library..." type="text"/>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">search</span>
+</div>
+<button id="search-toggle" class="md:hidden p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined">search</span>
+</button>
+<div class="flex gap-1 md:gap-2">
+<button class="p-1.5 md:p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined text-lg md:text-2xl">sensors</span>
+</button>
+<button class="p-1.5 md:p-2 text-on-surface-variant hover:bg-surface-container-high rounded-full transition-colors">
+<span class="material-symbols-outlined text-lg md:text-2xl">settings</span>
+</button>
+</div>
+</div>
+</div>
+</header>
+<!-- Content Canvas -->
+<div class="flex-1 p-4 md:p-8 max-w-max-width mx-auto w-full">
+<div class="flex flex-col md:flex-row items-start md:items-end justify-between gap-3 md:gap-4 mb-6 md:mb-8">
+<div>
+<h3 class="text-headline-sm md:text-headline-md font-headline-md text-on-surface">Active Tasks</h3>
+<p class="text-body-sm md:text-body-lg text-on-surface-variant">Currently curating your digital assets.</p>
+</div>
+<div class="flex gap-2 w-full md:w-auto">
+<button class="flex-1 md:flex-none px-3 py-1.5 md:px-4 md:py-2 text-label-caps font-label-caps bg-surface-container border border-outline-variant rounded-lg hover:border-primary transition-all text-xs md:text-sm">Resume All</button>
+<button class="flex-1 md:flex-none px-3 py-1.5 md:px-4 md:py-2 text-label-caps font-label-caps bg-surface-container border border-outline-variant rounded-lg hover:border-error transition-all text-xs md:text-sm">Pause All</button>
+</div>
+</div>
+<!-- Download List -->
+<div id="task-list" class="space-y-4"></div>
+</div>
+</main>
+<!-- Background Atmospheric Effect -->
+<div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+<div class="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-primary/5 rounded-full blur-[120px]"></div>
+<div class="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-secondary/5 rounded-full blur-[120px]"></div>
+</div>
+<script>
+(function() {
+  // ---- Helpers ----
+  function fmtBytes(bytes) {
+    if (bytes == null || bytes === 0) return '0 B';
+    var units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    var i = 0; var v = bytes;
+    while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+    return v.toFixed(i === 0 ? 0 : 1) + ' ' + units[i];
+  }
 
-      ws.onclose = () => {
-        setConnected(false);
-        showToast('Disconnected – reconnecting…');
-        scheduleReconnect();
-      };
+  function fmtPct(progress) {
+    return (progress * 100).toFixed(1) + '%';
+  }
 
-      ws.onerror = () => {
-        badge.className = 'error';
-        badge.textContent = 'Error';
-      };
+  function getFileType(filename) {
+    var parts = filename.split('.');
+    var ext = parts.length > 1 ? parts[parts.length - 1].toLowerCase() : '';
+    var video = ['mp4', 'mkv', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v'];
+    var music = ['mp3', 'flac', 'wav', 'aac', 'ogg', 'wma', 'm4a', 'opus'];
+    if (video.indexOf(ext) !== -1) return 'video';
+    if (music.indexOf(ext) !== -1) return 'music';
+    return 'document';
+  }
+
+  function escapeHtml(text) {
+    var d = document.createElement('div');
+    d.textContent = text;
+    return d.innerHTML;
+  }
+
+  function iconForType(type) {
+    if (type === 'video') return 'movie';
+    if (type === 'music') return 'music_note';
+    return 'description';
+  }
+
+  function buildTaskCard(task) {
+    var id = 'task-' + task.task_id;
+    var type = getFileType(task.file_name);
+    var pct = task.progress || 0;
+    var isDownloading = task.status === 'DOWNLOADING';
+    var isPending = task.status === 'PENDING';
+    var isCompleted = task.status === 'COMPLETED';
+    var isFailed = task.status === 'FAILED';
+    var downloaded = fmtBytes(task.downloaded_bytes);
+    var total = fmtBytes(task.file_size_bytes);
+
+    var dimmed = isPending ? ' opacity-80 grayscale-[0.5]' : '';
+    var hover = isPending ? ' hover:grayscale-0 hover:opacity-100' : '';
+
+    var iconBoxBg, iconColor, iconStyle;
+    if (isCompleted) {
+      iconBoxBg = 'bg-tertiary/10 border-tertiary/20';
+      iconColor = 'text-tertiary';
+      iconStyle = "font-variation-settings: 'FILL' 1;";
+    } else if (isDownloading) {
+      iconBoxBg = 'bg-secondary/10 border-secondary/20';
+      iconColor = 'text-secondary';
+      iconStyle = "font-variation-settings: 'FILL' 1;";
+    } else {
+      iconBoxBg = 'bg-surface-container-high border-outline-variant';
+      iconColor = 'text-on-surface-variant';
+      iconStyle = '';
     }
 
-    function scheduleReconnect() {
-      if (reconnectTimer) clearTimeout(reconnectTimer);
-      reconnectTimer = setTimeout(() => {
-        connectWS();
-      }, 3000);
+    var badgeClass, badgeText;
+    if (isDownloading) {
+      badgeClass = 'bg-primary/10 text-primary border-primary/20';
+      badgeText = 'DOWNLOADING';
+    } else if (isPending) {
+      badgeClass = 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
+      badgeText = 'PENDING';
+    } else if (isCompleted) {
+      badgeClass = 'bg-tertiary/10 text-tertiary border-tertiary/20';
+      badgeText = 'COMPLETED';
+    } else if (isFailed) {
+      badgeClass = 'bg-error-container/10 text-error border-error/20';
+      badgeText = 'FAILED';
+    } else {
+      badgeClass = 'bg-surface-container-highest text-on-surface-variant border-outline-variant';
+      badgeText = task.status;
     }
 
-    connectWS();
-  </script>
-</body>
-</html>
+    var bytesInfo = '';
+    if (isDownloading && task.file_size_bytes) {
+      bytesInfo = downloaded + ' / ' + total;
+    } else if (isCompleted && task.file_size_bytes) {
+      bytesInfo = total;
+    } else if (isPending && task.file_size_bytes) {
+      bytesInfo = '0 B / ' + total;
+    } else if (task.file_size_bytes) {
+      bytesInfo = total;
+    }
+
+    var statusLine = '';
+    if (isDownloading) {
+      statusLine = '<span class="w-1 h-1 bg-outline-variant rounded-full"></span><span class="text-label-caps font-label-caps text-secondary">' + downloaded + '/s</span>';
+    } else if (isPending) {
+      statusLine = '<span class="w-1 h-1 bg-outline-variant rounded-full"></span><span class="text-label-caps font-label-caps text-on-surface-variant">Waiting...</span>';
+    } else if (isCompleted) {
+      statusLine = '<span class="w-1 h-1 bg-outline-variant rounded-full"></span><span class="text-label-caps font-label-caps text-primary flex items-center gap-1"><span class="material-symbols-outlined text-sm">check</span> Downloaded</span>';
+    }
+
+    var progressBar = '';
+    if (isDownloading) {
+      progressBar = '<div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden relative"><div class="h-full bg-primary relative overflow-hidden transition-all duration-500" style="width: ' + (pct * 100) + '%;"><div class="absolute inset-0 progress-shimmer"></div></div></div>';
+    } else if (isCompleted) {
+      progressBar = '<div class="w-full h-2 bg-primary/20 rounded-full overflow-hidden"><div class="h-full bg-primary" style="width: 100%;"></div></div>';
+    } else if (isFailed) {
+      progressBar = '<div class="w-full h-2 bg-error/20 rounded-full overflow-hidden"><div class="h-full bg-error" style="width: ' + (pct * 100) + '%;"></div></div>';
+    } else {
+      progressBar = '<div class="w-full h-2 bg-surface-container-highest rounded-full overflow-hidden"><div class="h-full bg-outline-variant" style="width: 0%;"></div></div>';
+    }
+
+    var actionsHtml = '';
+    if (isCompleted) {
+      actionsHtml = '<div class="flex gap-2"><button class="p-2 bg-surface-container-high text-on-surface hover:text-primary transition-colors rounded-lg"><span class="material-symbols-outlined">play_arrow</span></button><button class="p-2 bg-surface-container-high text-on-surface hover:text-primary transition-colors rounded-lg"><span class="material-symbols-outlined">folder_open</span></button></div>';
+    }
+
+    var fileNameColor = isCompleted ? '' : (isDownloading ? ' group-hover:text-primary transition-colors' : '');
+
+    return '<div id="' + id + '" class="group relative bg-surface-container-low border border-outline-variant rounded-xl p-4 md:p-6 transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] hover:border-primary/30' + dimmed + hover + '">' +
+        '<div class="flex flex-col md:flex-row items-start justify-between gap-3 mb-4">' +
+          '<div class="flex items-center gap-3 md:gap-4 w-full md:w-auto min-w-0">' +
+            '<div class="w-10 h-10 md:w-12 md:h-12 rounded-xl shrink-0 ' + iconBoxBg + ' flex items-center justify-center border">' +
+              '<span class="material-symbols-outlined ' + iconColor + ' text-xl md:text-2xl" style="' + iconStyle + '">' + iconForType(type) + '</span>' +
+            '</div>' +
+            '<div class="min-w-0 flex-1">' +
+              '<h4 class="text-sm md:text-headline-sm font-headline-sm text-on-surface truncate' + fileNameColor + '">' + escapeHtml(task.file_name) + '</h4>' +
+              '<div class="flex items-center gap-2 md:gap-3 mt-1 flex-wrap">' +
+                '<span class="text-[10px] md:text-label-caps font-label-caps text-on-surface-variant">' + bytesInfo + '</span>' +
+                statusLine +
+              '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="flex flex-row md:flex-col items-center md:items-end justify-between w-full md:w-auto gap-2">' +
+            '<span class="px-2 py-0.5 md:px-3 md:py-1 text-[10px] md:text-label-caps ' + badgeClass + ' rounded-full font-label-caps">' + badgeText + '</span>' +
+            (isDownloading ? '<span class="text-sm md:text-headline-sm font-headline-sm text-on-surface">' + fmtPct(pct) + '</span>' : '') +
+            actionsHtml +
+          '</div>' +
+        '</div>' +
+        progressBar +
+      '</div>';
+  }
+
+  var taskList = document.getElementById('task-list');
+  var connectionBadge = document.getElementById('connection-badge');
+  var TERMINAL_STATUSES = ['COMPLETED', 'FAILED', 'CANCELLED'];
+  var POLL_INTERVAL = 15000;
+
+  // ---- DOM Render ----
+
+  function renderTask(task) {
+    var html = buildTaskCard(task);
+    var existing = document.getElementById('task-' + task.task_id);
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      var empty = taskList.querySelector('[data-empty]');
+      if (empty) empty.remove();
+      taskList.insertAdjacentHTML('beforeend', html);
+    }
+  }
+
+  function renderTasks(tasks) {
+    taskList.innerHTML = '';
+    if (!tasks || tasks.length === 0) {
+      renderEmpty();
+      return;
+    }
+    for (var i = 0; i < tasks.length; i++) {
+      taskList.insertAdjacentHTML('beforeend', buildTaskCard(tasks[i]));
+    }
+  }
+
+  function renderEmpty() {
+    taskList.innerHTML =
+      '<div data-empty class="flex flex-col items-center justify-center py-20 text-on-surface-variant">' +
+        '<span class="material-symbols-outlined text-6xl mb-4 opacity-30">download</span>' +
+        '<p class="text-headline-sm font-headline-sm">No active downloads</p>' +
+        '<p class="text-body-sm mt-1">Send a file to the bot to get started.</p>' +
+      '</div>';
+  }
+
+  function renderError(msg) {
+    taskList.innerHTML =
+      '<div data-empty class="flex flex-col items-center justify-center py-20 text-on-surface-variant">' +
+        '<span class="material-symbols-outlined text-6xl mb-4 opacity-30 text-error">error_outline</span>' +
+        '<p class="text-headline-sm font-headline-sm text-error">Could not load tasks</p>' +
+        '<p class="text-body-sm mt-1">' + escapeHtml(msg || 'Check connection and try again.') + '</p>' +
+      '</div>';
+  }
+
+  function setConnected(ok) {
+    var dot = ok
+      ? '<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>'
+      : '<span class="relative inline-flex rounded-full h-2 w-2 bg-on-surface-variant"></span>';
+    var text = ok ? 'Connected' : 'Disconnected';
+    var textClass = ok ? 'text-primary' : 'text-on-surface-variant';
+
+    connectionBadge.innerHTML =
+      '<span class="relative flex h-2 w-2">' + dot + '</span>' +
+      '<span class="text-[10px] font-bold ' + textClass + ' tracking-widest uppercase">' + text + '</span>';
+
+    var dotEl = document.getElementById('connection-dot');
+    if (dotEl) dotEl.innerHTML = dot;
+  }
+
+  // ---- API ----
+  function fetchActiveTasks() {
+    fetch('/tasks/active')
+      .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function(tasks) {
+        renderTasks(tasks);
+      })
+      .catch(function(err) {
+        renderError(err.message);
+      });
+  }
+
+  // ---- WebSocket ----
+  var ws = null;
+  var reconnectTimer = null;
+  var pollTimer = null;
+
+  function connectWS() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) return;
+
+    var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
+    var url = protocol + '://' + location.host + '/ws';
+    ws = new WebSocket(url);
+
+    ws.onopen = function() {
+      setConnected(true);
+      fetchActiveTasks();
+    };
+
+    ws.onmessage = function(event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (TERMINAL_STATUSES.indexOf(data.status) !== -1) {
+          fetchActiveTasks();
+        } else {
+          renderTask(data);
+        }
+      } catch (e) {
+        console.warn('WS message error:', e);
+      }
+    };
+
+    ws.onclose = function() {
+      setConnected(false);
+      startPolling();
+      scheduleReconnect();
+    };
+
+    ws.onerror = function() {
+      setConnected(false);
+      startPolling();
+    };
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(function() { connectWS(); }, 3000);
+  }
+
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    pollTimer = setInterval(function() {
+      fetchActiveTasks();
+    }, POLL_INTERVAL);
+  }
+
+  // ---- Sidebar Tab Switching ----
+  document.querySelectorAll('aside nav a').forEach(function(link) {
+    link.addEventListener('click', function(e) {
+      document.querySelectorAll('aside nav a').forEach(function(l) {
+        l.classList.remove('bg-secondary-container', 'dark:bg-on-secondary-fixed-variant', 'text-on-secondary-container', 'dark:text-secondary-fixed');
+        l.classList.add('text-on-surface-variant');
+      });
+      this.classList.add('bg-secondary-container', 'dark:bg-on-secondary-fixed-variant', 'text-on-secondary-container', 'dark:text-secondary-fixed');
+      this.classList.remove('text-on-surface-variant');
+    });
+  });
+
+  // ---- Sidebar Toggle (Mobile) ----
+  var menuToggle = document.getElementById('menu-toggle');
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+
+  function openSidebar() {
+    sidebar.classList.remove('-translate-x-full');
+    sidebar.classList.add('translate-x-0');
+    overlay.classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.add('-translate-x-full');
+    sidebar.classList.remove('translate-x-0');
+    overlay.classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+  }
+
+  if (menuToggle) {
+    menuToggle.addEventListener('click', function() {
+      if (sidebar.classList.contains('-translate-x-full')) {
+        openSidebar();
+      } else {
+        closeSidebar();
+      }
+    });
+  }
+
+  if (overlay) {
+    overlay.addEventListener('click', closeSidebar);
+  }
+
+  // Close sidebar on nav link click (mobile)
+  document.querySelectorAll('aside nav a').forEach(function(link) {
+    link.addEventListener('click', function() {
+      closeSidebar();
+    });
+  });
+
+  // ---- Init ----
+  fetchActiveTasks();
+  connectWS();
+})();
+</script>
+</body></html>

@@ -1,0 +1,12 @@
+netalertx/
+homeassistant/
+sync/
+arcane/
+.git/
+__pycache__/
+*.pyc
+*.db
+*.session
+*.log
+downloads/
+downloaded/

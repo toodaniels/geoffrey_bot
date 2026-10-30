@@ -1,7 +1,7 @@
 services:
   geoffrey-bot:
     container_name: geoffrey-bot
-    build: .  # Esto le dice que compile la carpeta actual
+    image: ghcr.io/toodaniels/geoffrey_bot:main
     env_file:
       - .env
     volumes:
