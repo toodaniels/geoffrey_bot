@@ -1,232 +1,232 @@
 # Geoffrey Download Dashboard — Technical Requirements
 
-> Basado en el diseño de `api/code.html`. Ordenado por **posibilidad de desarrollo** (de más inmediato a más complejo).
+> Based on the design in `api/code.html`. Ordered by **ease of development** (from most immediate to most complex).
 
 ---
 
-## Leyenda
+## Legend
 
-| Símbolo | Significado |
+| Symbol | Meaning |
 |---------|-------------|
-| ✅ | Ya existe en backend o frontend |
-| 🟢 | Fácil de implementar (horas) |
-| 🟡 | Moderado (1-2 días) |
-| 🔴 | Complejo (semanas o depende de nueva infraestructura) |
+| ✅ | Already exists in the backend or frontend |
+| 🟢 | Easy to implement (hours) |
+| 🟡 | Moderate (1-2 days) |
+| 🔴 | Complex (weeks or depends on new infrastructure) |
 
 ---
 
-## 1. Reemplazar Dashboard Actual con el Nuevo Diseño
+## 1. Replace the Current Dashboard with the New Design
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Servir `code.html` como dashboard principal | 🟢 | Reemplazar `templates/index.html` con `code.html` (el diseño ya está listo). Ajustar rutas de assets (Tailwind CDN, Google Fonts) |
-| Conexión WebSocket para updates en vivo | ✅ | `api/websocket_manager.py` + endpoint `/ws` ya existen. Solo falta integrar JS en `code.html` |
-| Renderizar tareas activas desde `GET /tasks/active` | ✅ | Endpoint ya existe. Falta conectar frontend |
+| Serve `code.html` as the main dashboard | 🟢 | Replace `templates/index.html` with `code.html` (the design is ready). Adjust asset paths (Tailwind CDN, Google Fonts) |
+| WebSocket connection for live updates | ✅ | `api/websocket_manager.py` + `/ws` endpoint already exist. Only the JS integration in `code.html` is missing |
+| Render active tasks from `GET /tasks/active` | ✅ | Endpoint already exists. The frontend connection is missing |
 
 **Checklist:**
 - [x] Backend: `GET /tasks/active`, `PATCH /tasks/{task_id}`, `/ws`
-- [ ] Reemplazar `templates/index.html` con el nuevo diseño
-- [ ] JS: conectar WebSocket y mapear `data.task → tarjeta HTML`
-- [ ] JS: manejar estados vacío, error, reconexión
+- [ ] Replace `templates/index.html` with the new design
+- [ ] JS: connect the WebSocket and map `data.task → HTML card`
+- [ ] JS: handle empty, error and reconnection states
 
 ---
 
-## 2. Iconos de Tipo de Archivo en Tarjetas
+## 2. File Type Icons on Cards
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Mostrar icono Video/Music/Document según `file_name` | 🟢 | El bot ya detecta tipo MIME y lo guarda en `file_type`. Frontend: mapear extensión → icono Material Symbol |
+| Show a Video/Music/Document icon based on `file_name` | 🟢 | The bot already detects the MIME type and stores it in `file_type`. Frontend: map extension → Material Symbol icon |
 
 **Checklist:**
-- [x] Bot: `get_file_type()` y `check_filename_type()` ya existen
-- [ ] Frontend: agregar columna/lógica para mostrar icono según file_name/ext
-- [ ] Opcional: agregar campo `file_type` al modelo API para servirlo directamente
+- [x] Bot: `get_file_type()` and `check_filename_type()` already exist
+- [ ] Frontend: add the column/logic to show an icon based on file_name/ext
+- [ ] Optional: add a `file_type` field to the API model so it can be served directly
 
 ---
 
-## 3. Badges de Estado y Barras de Progreso
+## 3. Status Badges and Progress Bars
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Badge DOWNLOADING/PENDING/COMPLETED | 🟢 | CSS ya está en `code.html`. Solo falta aplicar clase según `task.status` |
-| Progress bar con animación shimmer | 🟢 | CSS con `progress-shimmer` ya existe |
-| Porcentaje y bytes descargados | ✅ | `task.progress`, `task.downloaded_bytes`, `task.file_size_bytes` ya están en API |
+| DOWNLOADING/PENDING/COMPLETED badge | 🟢 | The CSS is already in `code.html`. Only applying the class based on `task.status` is missing |
+| Progress bar with shimmer animation | 🟢 | The `progress-shimmer` CSS already exists |
+| Percentage and bytes downloaded | ✅ | `task.progress`, `task.downloaded_bytes`, `task.file_size_bytes` are already in the API |
 
 **Checklist:**
-- [x] API devuelve `progress`, `downloaded_bytes`, `file_size_bytes`, `status`
-- [ ] Frontend: mapear `task.status` a clase CSS (DOWNLOADING → verde, PENDING → gris, COMPLETED → dorado)
-- [ ] Frontend: formatear bytes (B/KB/MB/GB) y porcentaje
+- [x] The API returns `progress`, `downloaded_bytes`, `file_size_bytes`, `status`
+- [ ] Frontend: map `task.status` to a CSS class (DOWNLOADING → green, PENDING → gray, COMPLETED → gold)
+- [ ] Frontend: format bytes (B/KB/MB/GB) and percentage
 
 ---
 
-## 4. Filtros Sidebar: Videos / Music / Completed
+## 4. Sidebar Filters: Videos / Music / Completed
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Endpoint `GET /tasks?type=video` | 🟢 | Agregar query param `type` a endpoint existente o crear nuevo. Filtrar por extensión en DB |
-| Endpoint `GET /tasks?status=completed` | 🟢 | Agregar query param `status` a endpoint existente. DB ya tiene campo `status` |
-| Conexión frontend al hacer clic en sidebar | 🟢 | JS: cambiar endpoint según tab activo, re-renderizar lista |
+| `GET /tasks?type=video` endpoint | 🟢 | Add a `type` query param to the existing endpoint or create a new one. Filter by extension in the DB |
+| `GET /tasks?status=completed` endpoint | 🟢 | Add a `status` query param to the existing endpoint. The DB already has a `status` field |
+| Frontend connection on sidebar click | 🟢 | JS: change the endpoint based on the active tab, re-render the list |
 
 **Checklist:**
-- [x] DB tiene `status` (PENDING, DOWNLOADING, COMPLETED, FAILED, CANCELLED)
-- [ ] Backend: agregar query params `type` y `status` a `GET /tasks/active` o crear `GET /tasks`
-- [ ] Frontend: manejar tabs de sidebar con cambio de endpoint
-- [ ] Frontend: active tab state con estilo destacado (ya existe en `code.html`)
+- [x] The DB has `status` (PENDING, DOWNLOADING, COMPLETED, FAILED, CANCELLED)
+- [ ] Backend: add `type` and `status` query params to `GET /tasks/active` or create `GET /tasks`
+- [ ] Frontend: handle sidebar tabs with endpoint switching
+- [ ] Frontend: active tab state with highlighted styling (already in `code.html`)
 
 ---
 
-## 5. Velocidad de Descarga en Tiempo Real
+## 5. Real-Time Download Speed
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Calcular MB/s desde `report_progress` | 🟡 | El bot ya tiene callback cada 3s. Calcular delta de bytes / delta de tiempo |
-| Almacenar velocidad en API | 🟡 | Agregar campo opcional `download_speed` al modelo `DownloadTask` y schema `DownloadTaskUpdate` |
-| Mostrar en frontend (ej: "2.4 MB/s") | 🟢 | Solo mostrar campo si `status == DOWNLOADING` |
+| Calculate MB/s from `report_progress` | 🟡 | The bot already has a callback every 3s. Compute the delta of bytes / delta of time |
+| Store the speed in the API | 🟡 | Add an optional `download_speed` field to the `DownloadTask` model and the `DownloadTaskUpdate` schema |
+| Display it in the frontend (e.g. "2.4 MB/s") | 🟢 | Only show the field when `status == DOWNLOADING` |
 
 **Checklist:**
-- [x] Bot: `report_progress()` se ejecuta cada 3s con `received` y `total`
-- [ ] Bot: calcular `speed = (received - last_received) / (now - last_time)`
-- [ ] API: agregar `download_speed: Optional[float]` a `DownloadTask` y a `DownloadTaskUpdate`
-- [ ] Frontend: mostrar speed cuando `status == DOWNLOADING`
+- [x] Bot: `report_progress()` runs every 3s with `received` and `total`
+- [ ] Bot: compute `speed = (received - last_received) / (now - last_time)`
+- [ ] API: add `download_speed: Optional[float]` to `DownloadTask` and `DownloadTaskUpdate`
+- [ ] Frontend: show the speed when `status == DOWNLOADING`
 
 ---
 
-## 6. Estado de Almacenamiento (Storage Status)
+## 6. Storage Status
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Endpoint `GET /storage/status` | 🟢 | Usar `shutil.disk_usage(DOWNLOAD_PATH)` → total, used, free |
-| Mostrar GB libres en bento card | 🟢 | Frontend: renderizar `free` en la card "Storage Status" |
-| Botón "Manage Storage" | 🟡 | Podría redirigir a endpoint que ejecute `migrate_watched.py` o mostrar página de gestión |
+| `GET /storage/status` endpoint | 🟢 | Use `shutil.disk_usage(DOWNLOAD_PATH)` → total, used, free |
+| Show free GB in a bento card | 🟢 | Frontend: render `free` in the "Storage Status" card |
+| "Manage Storage" button | 🟡 | Could redirect to an endpoint that runs `migrate_watched.py` or show a management page |
 
 **Checklist:**
-- [x] Scripts existentes: `migrate_watched.py`, `check_watched.py`
-- [ ] Backend: endpoint `GET /storage`
-- [ ] Frontend: conectar bento card con data del endpoint
-- [ ] Opcional: backend endpoint `POST /storage/cleanup` que ejecute migración
+- [x] Existing scripts: `migrate_watched.py`, `check_watched.py`
+- [ ] Backend: `GET /storage` endpoint
+- [ ] Frontend: connect the bento card to the endpoint data
+- [ ] Optional: backend `POST /storage/cleanup` endpoint that runs the migration
 
 ---
 
-## 7. Búsqueda en Biblioteca
+## 7. Library Search
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Endpoint `GET /tasks?q=<query>` | 🟢 | SQL `WHERE file_name LIKE '%query%'` |
-| Input de búsqueda en TopAppBar | 🟢 | HTML ya existe en `code.html`. JS: debounce + fetch + re-render |
+| `GET /tasks?q=<query>` endpoint | 🟢 | SQL `WHERE file_name LIKE '%query%'` |
+| Search input in the TopAppBar | 🟢 | The HTML already exists in `code.html`. JS: debounce + fetch + re-render |
 
 **Checklist:**
-- [ ] Backend: agregar query param `q` a endpoint de listado
-- [ ] Frontend: conectar search input con debounce (300ms) al endpoint
+- [ ] Backend: add a `q` query param to the listing endpoint
+- [ ] Frontend: connect the search input with a debounce (300ms) to the endpoint
 
 ---
 
 ## 8. Resume All / Pause All
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Endpoint `POST /tasks/batch/update` | 🟡 | Aceptar lista de task_ids + nuevo status. Transacción SQL |
-| Botón Resume All → PENDING | 🟡 | Solo para tareas PAUSED (nuevo status a considerar) o FAILED |
-| Botón Pause All → PAUSED | 🟡 | Requiere nuevo status `PAUSED` en enum, o cancelar tareas activas |
+| `POST /tasks/batch/update` endpoint | 🟡 | Accept a list of task_ids + a new status. SQL transaction |
+| Resume All button → PENDING | 🟡 | Only for PAUSED tasks (a new status to consider) or FAILED |
+| Pause All button → PAUSED | 🟡 | Requires a new `PAUSED` status in the enum, or cancelling active tasks |
 
-> Nota: el status `PAUSED` no existe actualmente. Habría que decidir si se introduce o si "Pause All" cancela y "Resume All" re-intenta.
+> Note: the `PAUSED` status does not currently exist. We would need to decide whether to introduce it or whether "Pause All" cancels and "Resume All" retries.
 
 **Checklist:**
-- [ ] Decidir: ¿nuevo status `PAUSED` o reusar `CANCELLED`/`PENDING`?
-- [ ] Backend: endpoint batch update
-- [ ] Bot: manejar tareas pausadas (no tomarlas del queue)
+- [ ] Decide: a new `PAUSED` status or reuse `CANCELLED`/`PENDING`?
+- [ ] Backend: batch update endpoint
+- [ ] Bot: handle paused tasks (do not take them from the queue)
 
 ---
 
 ## 9. Bento Stats: Total Bandwidth
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Calcular ancho de banda total (GB/día) | 🟡 | Sumar `downloaded_bytes` de tareas COMPLETED hoy, dividir entre horas del día |
-| Endpoint `GET /stats/bandwidth` | 🟡 | Query agregado SQL |
-| Frontend: mostrar en bento card | 🟢 | Renderizar dato + barra de uso |
+| Calculate total bandwidth (GB/day) | 🟡 | Sum `downloaded_bytes` of tasks COMPLETED today, divide by the hours of the day |
+| `GET /stats/bandwidth` endpoint | 🟡 | Aggregated SQL query |
+| Frontend: show it in a bento card | 🟢 | Render the value + usage bar |
 
 **Checklist:**
-- [x] DB tiene `downloaded_bytes` y `updated_at`
-- [ ] Backend: endpoint de estadísticas agregadas
-- [ ] Frontend: renderizar bento card "Total Bandwidth"
+- [x] The DB has `downloaded_bytes` and `updated_at`
+- [ ] Backend: aggregated statistics endpoint
+- [ ] Frontend: render the "Total Bandwidth" bento card
 
 ---
 
-## 10. Play / Folder Abrir Archivo
+## 10. Play / Folder — Open File
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Endpoint `GET /files/{task_id}/download` | 🟡 | Servir archivo estático desde `DOWNLOAD_PATH`. Stream directo |
-| Botón Play → abrir reproductor | 🟡 | Frontend: `window.open()` o reproducción in-browser |
-| Botón Folder → abrir ubicación | 🔴 | No es posible desde web. Alternativa: copiar ruta al portapapeles o servir ZIP |
+| `GET /files/{task_id}/download` endpoint | 🟡 | Serve a static file from `DOWNLOAD_PATH`. Direct stream |
+| Play button → open the player | 🟡 | Frontend: `window.open()` or in-browser playback |
+| Folder button → open the location | 🔴 | Not possible from the web. Alternative: copy the path to the clipboard or serve a ZIP |
 
 **Checklist:**
-- [ ] Backend: endpoint de descarga/serve de archivo completado
-- [ ] Frontend: botón "Play" abre archivo en nueva pestaña
-- [ ] Frontend: botón "Folder" copia ruta al clipboard
+- [ ] Backend: download/serve endpoint for a completed file
+- [ ] Frontend: "Play" button opens the file in a new tab
+- [ ] Frontend: "Folder" button copies the path to the clipboard
 
 ---
 
-## 11. Add URL (Descarga por URL)
+## 11. Add URL (Download by URL)
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Input URL + botón "Add URL" en sidebar | 🟢 | HTML ya existe. Modal o input inline |
-| Backend `POST /download/url` | 🔴 | Recibir URL, validar, encolar descarga |
-| Integración con yt-dlp / aria2 | 🔴 | Nuevo worker en bot para descargas HTTP/S |
-| WebSocket broadcast de progreso | 🟡 | Reusar `ConnectionManager.broadcast()` existente |
+| URL input + "Add URL" button in the sidebar | 🟢 | The HTML already exists. Modal or inline input |
+| Backend `POST /download/url` | 🔴 | Receive a URL, validate it, queue the download |
+| Integration with yt-dlp / aria2 | 🔴 | New worker in the bot for HTTP/S downloads |
+| WebSocket progress broadcast | 🟡 | Reuse the existing `ConnectionManager.broadcast()` |
 
 **Checklist:**
-- [ ] Agregar `yt-dlp` u otra lib a `pyproject.toml`
-- [ ] Backend: endpoint `POST /tasks/url` que cree tarea
-- [ ] Bot: nuevo worker de descarga por URL
-- [ ] Frontend: modal/botón "Add URL" + feedback
+- [ ] Add `yt-dlp` or another lib to `pyproject.toml`
+- [ ] Backend: `POST /tasks/url` endpoint that creates the task
+- [ ] Bot: new URL download worker
+- [ ] Frontend: "Add URL" modal/button + feedback
 
 ---
 
-## 12. Página de Settings
+## 12. Settings Page
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Ruta/servir página Settings | 🟡 | Nueva ruta `/settings` en FastAPI |
-| Formulario de configuración (ALLOWED_USERS, DOWNLOAD_PATH, etc.) | 🔴 | Requiere persistencia de config en DB o archivo, reinicio de servicios |
-| Botón "Manage Storage" | 🟡 | Enlace a acción de cleanup/migrate |
+| Route/serve the Settings page | 🟡 | New `/settings` route in FastAPI |
+| Configuration form (ALLOWED_USERS, DOWNLOAD_PATH, etc.) | 🔴 | Requires config persistence in the DB or a file, and restarting services |
+| "Manage Storage" button | 🟡 | Link to the cleanup/migrate action |
 
 **Checklist:**
-- [ ] Backend: endpoint config API
-- [ ] Backend: persistencia de settings
-- [ ] Frontend: formulario + guardado
+- [ ] Backend: config API endpoint
+- [ ] Backend: settings persistence
+- [ ] Frontend: form + saving
 
 ---
 
-## 13. Autenticación
+## 13. Authentication
 
-| Ítem | Estado | Requisitos |
+| Item | Status | Requirements |
 |------|--------|------------|
-| Auth middleware en API | 🔴 | Actualmente todos los endpoints son públicos. Agregar JWT o API Key |
-| Login page | 🔴 | Nueva ruta + formulario + token storage |
-| Proteger WebSocket | 🔴 | Validar token en conexión WS |
+| Auth middleware in the API | 🔴 | All endpoints are currently public. Add JWT or an API Key |
+| Login page | 🔴 | New route + form + token storage |
+| Protect the WebSocket | 🔴 | Validate the token on the WS connection |
 
-> ⚠️ Actualmente la API no tiene ningún tipo de autenticación. Si se expone públicamente, esto es crítico.
+> ⚠️ The API currently has no authentication of any kind. If it is exposed publicly, this is critical.
 
 **Checklist:**
-- [ ] Decidir esquema (API Key en header vs JWT)
-- [ ] Backend: middleware de autenticación
+- [ ] Decide on the scheme (API Key in a header vs JWT)
+- [ ] Backend: authentication middleware
 - [ ] Frontend: login flow
-- [ ] Frontend: attach token a fetch/WS
+- [ ] Frontend: attach the token to fetch/WS
 
 ---
 
-## Resumen de Prioridades
+## Priority Summary
 
-| Prioridad | Features | Esfuerzo |
+| Priority | Features | Effort |
 |-----------|----------|----------|
-| **P0** (ahora) | 1. Dashboard nuevo, 2. Iconos, 3. Badges/Progress | Horas |
-| **P1** (próximo) | 4. Filtros sidebar, 5. Velocidad, 6. Storage status, 7. Búsqueda | 1-2 días |
-| **P2** (corto plazo) | 8. Resume/Pause All, 9. Bandwidth stats, 10. Play/Folder | 2-3 días |
-| **P3** (medio plazo) | 11. Add URL, 12. Settings | 1-2 semanas |
-| **P4** (largo plazo) | 13. Autenticación | Variable |
+| **P0** (now) | 1. New dashboard, 2. Icons, 3. Badges/Progress | Hours |
+| **P1** (next) | 4. Sidebar filters, 5. Speed, 6. Storage status, 7. Search | 1-2 days |
+| **P2** (short term) | 8. Resume/Pause All, 9. Bandwidth stats, 10. Play/Folder | 2-3 days |
+| **P3** (medium term) | 11. Add URL, 12. Settings | 1-2 weeks |
+| **P4** (long term) | 13. Authentication | Variable |
 
 ---
 
-*Documento generado a partir del diseño en `api/code.html` y análisis del código existente.*
+*Document generated from the design in `api/code.html` and an analysis of the existing code.*
