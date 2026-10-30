@@ -1,43 +1,44 @@
-# Arcane — panel web de contenedores
+# Arcane — container web panel
 
-Interfaz web para ver y controlar los contenedores del usuario (`geoffrey-bot`,
-`myjellyfin`, `homeassistant`, …) en este servidor.
+Web interface to view and control the user's containers (`geoffrey-bot`,
+`myjellyfin`, `homeassistant`, …) on this server.
 
-- **URL LAN:** http://192.168.1.91:3552
-- **Primer login:** `arcane` / `arcane-admin` → **cambiar la contraseña en el primer acceso**
-- **Gestión:** systemd de usuario (Quadlet), no `podman compose`
+- **LAN URL:** http://192.168.1.91:3552
+- **First login:** `arcane` / `arcane-admin` → **change the password on first access**
+- **Management:** user systemd (Quadlet), not `podman compose`
 
-## Por qué vive aquí y no en el compose de Geoffrey
+## Why it lives here and not in Geoffrey's compose
 
-- Arcane gestiona *stacks*. Dentro del stack que gestiona, un redeploy lo
-  recrearía a sí mismo a mitad de la operación.
-- `compose.yml` (bot-only, sin el montaje `/mnt/avivo`) tiene prioridad sobre
-  `docker-compose.yml`. Cualquier `podman compose up -d` en la raíz es una
-  ruleta para los tres contenedores que ya funcionan.
-- Ciclo de vida distinto: actualizar el panel no debe reiniciar descargas ni
+- Arcane manages *stacks*. Within the stack it manages, a redeploy would
+  recreate itself in the middle of the operation.
+- `compose.yml` (bot-only, without the `/mnt/avivo` mount) takes precedence over
+  `docker-compose.yml`. Any `podman compose up -d` in the root is a
+  gamble for the three containers that already work.
+- Different lifecycle: updating the panel should not restart downloads or
   streams.
-- `arcane/.env` (clave de cifrado) no se mezcla con el `.env` del bot.
+- `arcane/.env` (encryption key) is not mixed with the bot's `.env`.
 
-## Cómo está montado
+## How it is set up
 
 ```
-~/.config/containers/systemd/arcane.container   -> symlink a este directorio
-arcane/arcane.container    unidad (fuente de verdad, en este repo)
+~/.config/containers/systemd/arcane.container   -> symlink to this directory
+arcane/arcane.container    unit (source of truth, in this repo)
 arcane/.env                ENCRYPTION_KEY, APP_URL, PROJECTS_DIRECTORY  (chmod 600)
-arcane/data/               estado de Arcane: SQLite, config, logs  (gitignored)
-arcane/projects/           PROJECTS_DIRECTORY vacío, para stacks nuevos  (gitignored)
+arcane/data/               Arcane state: SQLite, config, logs  (gitignored)
+arcane/projects/           empty PROJECTS_DIRECTORY, for new stacks  (gitignored)
 ```
 
-El symlink es la única pieza fuera de la carpeta: systemd solo lee Quadlets de
-`~/.config/containers/systemd/`. El generador **sí sigue symlinks** (verificado).
+The symlink is the only piece outside the folder: systemd only reads Quadlets
+from `~/.config/containers/systemd/`. The generator **does follow symlinks**
+(verified).
 
-## Operación
+## Operation
 
 ```bash
-# estado
+# status
 systemctl --user status arcane --no-pager
 
-# arrancar / parar / reiniciar
+# start / stop / restart
 systemctl --user start arcane
 systemctl --user stop arcane
 systemctl --user restart arcane
@@ -46,50 +47,50 @@ systemctl --user restart arcane
 journalctl --user -u arcane -f
 podman logs -f arcane
 
-# arranca solo tras reboot? (linger ya está activo)
+# does it start on its own after a reboot? (linger is already active)
 systemctl --user is-enabled arcane
 ```
 
-## Actualizar Arcane
+## Updating Arcane
 
-Arcane corriendo como Quadlet **no se auto-actualiza** (su botón de update
-recrearía el contenedor fuera de systemd):
+Arcane running as a Quadlet **does not auto-update** (its update button
+would recreate the container outside of systemd):
 
 ```bash
 podman pull ghcr.io/getarcaneapp/manager:latest
 systemctl --user restart arcane
 ```
 
-Si se fija la imagen por digest en `arcane.container`, actualizar es cambiar el
-digest, `systemctl --user daemon-reload` y `restart`.
+If the image is pinned by digest in `arcane.container`, updating means changing
+the digest, `systemctl --user daemon-reload`, and `restart`.
 
 ## Backup
 
-Todo el estado está en `arcane/data/`. Basta con copiar esa carpeta con el
-servicio parado. **`arcane/.env` es imprescindible**: sin esa clave, los valores
-cifrados de la base de datos no se pueden descifrar.
+All the state lives in `arcane/data/`. Copying that folder with the
+service stopped is enough. **`arcane/.env` is essential**: without that key, the
+encrypted values in the database cannot be decrypted.
 
-## Desinstalar
+## Uninstall
 
 ```bash
 systemctl --user stop arcane
 rm ~/.config/containers/systemd/arcane.container
 systemctl --user daemon-reload
 podman rm -f arcane && podman rmi ghcr.io/getarcaneapp/manager:latest
-# y borrar esta carpeta
+# and delete this folder
 ```
 
-## Notas y trampas
+## Notes and pitfalls
 
-- **Socket = control total** de todos los contenedores del usuario. Solo LAN.
-  Si algún día se expone fuera, poner delante un socket-proxy.
-- **`PUID`/`PGID` deliberadamente ausentes.** En podman rootless, `PUID=1000`
-  mapea al uid 101000 del host, que no puede leer el socket (propiedad de 1000).
-  Dejando el contenedor como root interno, mapea a 1000 y funciona. Si alguna
-  versión obliga a bajar privilegios: `UserNS=keep-id` + `PUID=1000`.
-- **`git clean -fdx`** en este repo borraría `data/` y `.env` (están ignorados).
-- **Si se mueve o renombra esta carpeta**, el symlink queda colgando:
-  `ln -sfn <nueva-ruta>/arcane.container ~/.config/containers/systemd/`.
-- Arcane no gestiona pods ni Quadlets (limitación de la API Docker-compatible).
-- No adopta el compose de Geoffrey: el directorio de proyectos es este
-  `arcane/projects/` vacío. Los contenedores existentes se gestionan uno a uno.
+- **Socket = full control** over all of the user's containers. LAN only.
+  If it is ever exposed outside, put a socket-proxy in front of it.
+- **`PUID`/`PGID` deliberately absent.** In rootless podman, `PUID=1000`
+  maps to host uid 101000, which cannot read the socket (owned by 1000).
+  Leaving the container as internal root maps to 1000 and works. If some
+  version forces dropping privileges: `UserNS=keep-id` + `PUID=1000`.
+- **`git clean -fdx`** in this repo would delete `data/` and `.env` (they are ignored).
+- **If this folder is moved or renamed**, the symlink dangles:
+  `ln -sfn <new-path>/arcane.container ~/.config/containers/systemd/`.
+- Arcane does not manage pods or Quadlets (a limitation of the Docker-compatible API).
+- It does not adopt Geoffrey's compose: the project directory is this
+  empty `arcane/projects/`. Existing containers are managed one by one.
